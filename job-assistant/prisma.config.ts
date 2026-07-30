@@ -9,6 +9,7 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Migrate/introspection need a direct (non-pooled) connection to Neon.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });
