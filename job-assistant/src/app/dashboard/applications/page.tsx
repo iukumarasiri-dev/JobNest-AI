@@ -93,7 +93,11 @@ export default function ApplicationsPage() {
         {applications.map((a) => (
           <div key={a.id} className="border rounded p-4 flex justify-between items-start">
             <div>
-              <h3 className="font-semibold">{a.jobTitle} @ {a.companyName}</h3>
+              <h3 className="font-semibold">
+                <a href={`/dashboard/applications/${a.id}`} className="hover:underline">
+                  {a.jobTitle} @ {a.companyName}
+                </a>
+              </h3>
               <span className="text-xs bg-gray-100 px-2 py-1 rounded">{a.status}</span>
             </div>
             <button onClick={() => handleDelete(a.id)} className="text-red-500 text-sm">
