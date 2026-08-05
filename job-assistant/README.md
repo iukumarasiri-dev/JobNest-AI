@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JobNest AI
 
-## Getting Started
+An AI-powered job application assistant. Track job applications and generate tailored cover letters (with resume bullets and skills-match analysis planned) using an LLM, based on a pasted job description and your resume.
 
-First, run the development server:
+## Project structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+job-assistant/
+├── frontend/   Next.js app (UI)
+└── backend/    Express + TypeScript + Prisma API
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The two are separate apps with their own `package.json`, `node_modules`, and `.env` — the frontend talks to the backend over HTTP, not to the database directly.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Layer      | Choice                                  |
+| ---------- | ---------------------------------------- |
+| Frontend   | Next.js (App Router), Tailwind CSS, shadcn/ui |
+| Backend    | Express, TypeScript                      |
+| Database   | PostgreSQL (Neon)                        |
+| ORM        | Prisma                                   |
+| Validation | Zod                                      |
+| LLM        | Groq (Llama 3.3 70B, OpenAI-compatible SDK) |
 
-## Learn More
+## Getting started
 
-To learn more about Next.js, take a look at the following resources:
+Each app is run and installed independently.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Backend
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cd backend
+npm install
+npx prisma generate
+npm run dev
+```
 
-## Deploy on Vercel
+Runs on [http://localhost:4000](http://localhost:4000). Requires a `.env` file with `DATABASE_URL`, `DIRECT_URL`, `GROQ_API_KEY`, `PORT`, and `FRONTEND_URL`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Frontend
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Runs on [http://localhost:3000](http://localhost:3000). Requires a `.env` file with `NEXT_PUBLIC_API_URL` pointing at the backend.
+
+## Auth
+
+Custom-built, no third-party auth provider. Passwords are hashed with bcrypt; sessions are opaque IDs stored in a `Session` table and set as an httpOnly cookie (`session_id`) by the backend. Routes: `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` (see `backend/src/routes/auth.ts`).
+
+The frontend's `proxy.ts` does an optimistic cookie-presence check to redirect unauthenticated visitors away from `/dashboard`; real authorization happens in the backend on every request via `requireAuth` middleware. This relies on the frontend and backend sharing the `localhost` host in dev (cookies ignore port) — deploying to different domains later will need either a shared parent domain or moving the auth check to a server-side call to `/api/auth/me`.
+
+## Status
+
+- Auth (signup/login/logout/sessions) is fully migrated off Clerk and working end-to-end.
+- Resume and application CRUD, and cover letter generation, were originally built as Next.js API routes and still need to be ported into the Express backend (kept for reference under `backend/src/legacy-next-api/`). The frontend dashboard pages that call these are not yet wired to the new backend.
