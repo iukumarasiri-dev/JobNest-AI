@@ -25,7 +25,9 @@ authRouter.post("/signup", async (req, res) => {
   }
 
   const passwordHash = await hashPassword(password);
-  const user = await prisma.user.create({ data: { email, passwordHash, name } });
+  const user = await prisma.user.create({
+    data: { email, passwordHash, name, lastLoginAt: new Date() },
+  });
   await createSession(res, user.id);
 
   res.status(201).json({ id: user.id, email: user.email, name: user.name });
@@ -48,6 +50,7 @@ authRouter.post("/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession(res, user.id);
   res.json({ id: user.id, email: user.email, name: user.name });
 });
