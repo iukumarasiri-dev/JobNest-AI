@@ -2,78 +2,237 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import styles from "./signup.module.css";
+
+type SignupFormData = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+};
+
+type SignupErrors = Partial<Record<keyof SignupFormData | "general", string>>;
 
 export default function SignupPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [formData, setFormData] = useState<SignupFormData>({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<SignupErrors>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.name as keyof SignupFormData;
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name] || errors.general) {
+      setErrors((prev) => ({ ...prev, [name]: undefined, general: undefined }));
+    }
+  };
+
+  const validate = () => {
+    const next: SignupErrors = {};
+    if (!formData.firstName.trim()) next.firstName = "Required";
+    if (!formData.lastName.trim()) next.lastName = "Required";
+
+    if (!formData.email.trim()) {
+      next.email = "Please enter your email.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      next.email = "Enter a valid email address.";
+    }
+
+    if (!formData.password) {
+      next.password = "Required";
+    } else if (formData.password.length < 8) {
+      next.password = "Use 8+ characters";
+    }
+
+    if (!formData.confirmPassword) {
+      next.confirmPassword = "Required";
+    } else if (formData.confirmPassword !== formData.password) {
+      next.confirmPassword = "Passwords don't match";
+    }
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setPending(true);
+    if (!validate()) return;
+
+    setSubmitting(true);
+    setErrors((prev) => ({ ...prev, general: undefined }));
+
     try {
       await apiFetch("/api/auth/signup", {
         method: "POST",
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({
+          name: `${formData.firstName} ${formData.lastName}`.trim(),
+          email: formData.email,
+          password: formData.password,
+        }),
       });
       router.push("/dashboard");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setErrors((prev) => ({
+        ...prev,
+        general: err instanceof Error ? err.message : "Unable to create your account right now.",
+      }));
     } finally {
-      setPending(false);
+      setSubmitting(false);
     }
-  }
+  };
+
+  const inputClasses = (field: keyof SignupFormData) =>
+    `${styles.formInput}${errors[field] ? ` ${styles.error}` : ""}`;
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4 p-6">
-        <h1 className="text-xl font-semibold">Sign up</h1>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="name">Name</label>
-          <input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="border rounded px-3 py-2"
-          />
+    <div className={styles.signupPage}>
+      <div className={styles.signupMain}>
+        <div className={styles.signupCard}>
+          <div>
+            <h1 className={styles.signupTitle}>Create an account</h1>
+            <p className={styles.signupSubtitle}>
+              Already have an account?{" "}
+              <Link href="/login" className={styles.signupLink}>
+                Log in
+              </Link>
+            </p>
+
+            <form onSubmit={handleSubmit} className={styles.signupForm}>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="firstName" className={styles.formLabel}>
+                    First name
+                  </label>
+                  <input
+                    id="firstName"
+                    name="firstName"
+                    type="text"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    className={inputClasses("firstName")}
+                  />
+                  {errors.firstName && <p className={styles.errorText}>{errors.firstName}</p>}
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor="lastName" className={styles.formLabel}>
+                    Last name
+                  </label>
+                  <input
+                    id="lastName"
+                    name="lastName"
+                    type="text"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    className={inputClasses("lastName")}
+                  />
+                  {errors.lastName && <p className={styles.errorText}>{errors.lastName}</p>}
+                </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="email" className={styles.formLabel}>
+                  Email address
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className={inputClasses("email")}
+                />
+                {errors.email && <p className={styles.errorText}>{errors.email}</p>}
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="password" className={styles.formLabel}>
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={handleChange}
+                    className={inputClasses("password")}
+                  />
+                  {errors.password && <p className={styles.errorText}>{errors.password}</p>}
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor="confirmPassword" className={styles.formLabel}>
+                    Confirm your password
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    className={inputClasses("confirmPassword")}
+                  />
+                  {errors.confirmPassword && (
+                    <p className={styles.errorText}>{errors.confirmPassword}</p>
+                  )}
+                </div>
+              </div>
+
+              <p className={styles.helperText}>
+                Use 8 or more characters with a mix of letters, numbers &amp; symbols
+              </p>
+
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={showPassword}
+                  onChange={() => setShowPassword((prev) => !prev)}
+                />
+                Show password
+              </label>
+
+              <div className={styles.formFooter}>
+                <Link href="/login" className={styles.linkSecondary}>
+                  log in instead
+                </Link>
+                <button type="submit" disabled={submitting} className={styles.btnPrimary}>
+                  {submitting ? "Creating..." : "Create an account"}
+                </button>
+              </div>
+              {errors.general && <p className={styles.errorText}>{errors.general}</p>}
+            </form>
+          </div>
+
+          <div className={styles.signupIllustration}>
+            <img src="/images/signupimg.png" alt="" className={styles.signupImg} />
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="border rounded px-3 py-2"
-          />
+      </div>
+
+      <footer className={styles.siteFooter}>
+        <div className={styles.footerLang}>
+          English (United States)
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" />
+          </svg>
         </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="border rounded px-3 py-2"
-          />
+        <div className={styles.footerLinks}>
+          <a href="/help">Help</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" disabled={pending} className="rounded bg-black text-white py-2 disabled:opacity-50">
-          {pending ? "Creating account..." : "Sign up"}
-        </button>
-        <p className="text-sm">
-          Already have an account? <a href="/login" className="underline">Log in</a>
-        </p>
-      </form>
+      </footer>
     </div>
   );
 }
