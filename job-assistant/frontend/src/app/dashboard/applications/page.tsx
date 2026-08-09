@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 type Application = {
   id: string;
@@ -18,15 +19,13 @@ export default function ApplicationsPage() {
   const [loading, setLoading] = useState(false);
 
   async function loadApplications() {
-    const res = await fetch("/api/applications");
-    setApplications(await res.json());
+    setApplications(await apiFetch("/api/applications"));
   }
 
   useEffect(() => {
     let ignore = false;
     (async () => {
-      const res = await fetch("/api/applications");
-      const data = await res.json();
+      const data = await apiFetch("/api/applications");
       if (!ignore) setApplications(data);
     })();
     return () => {
@@ -37,9 +36,8 @@ export default function ApplicationsPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    await fetch("/api/applications", {
+    await apiFetch("/api/applications", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ companyName, jobTitle, jobDescription }),
     });
     setCompanyName("");
@@ -50,7 +48,7 @@ export default function ApplicationsPage() {
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/applications/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/applications/${id}`, { method: "DELETE" });
     await loadApplications();
   }
 

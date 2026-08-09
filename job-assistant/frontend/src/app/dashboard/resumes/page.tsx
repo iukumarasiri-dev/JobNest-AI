@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 type Resume = { id: string; title: string; rawText: string | null; isPrimary: boolean };
 
@@ -11,15 +12,13 @@ export default function ResumesPage() {
   const [loading, setLoading] = useState(false);
 
   async function loadResumes() {
-    const res = await fetch("/api/resumes");
-    setResumes(await res.json());
+    setResumes(await apiFetch("/api/resumes"));
   }
 
   useEffect(() => {
     let ignore = false;
     (async () => {
-      const res = await fetch("/api/resumes");
-      const data = await res.json();
+      const data = await apiFetch("/api/resumes");
       if (!ignore) setResumes(data);
     })();
     return () => {
@@ -30,9 +29,8 @@ export default function ResumesPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    await fetch("/api/resumes", {
+    await apiFetch("/api/resumes", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, rawText }),
     });
     setTitle("");
@@ -42,7 +40,7 @@ export default function ResumesPage() {
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/resumes/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/resumes/${id}`, { method: "DELETE" });
     await loadResumes();
   }
 

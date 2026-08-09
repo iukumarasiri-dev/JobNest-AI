@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import { apiFetch } from "@/lib/api";
 
 type GeneratedContent = {
   id: string;
@@ -29,24 +30,21 @@ export default function ApplicationDetailPage({
   const [error, setError] = useState("");
 
   async function loadData() {
-    const [appRes, genRes] = await Promise.all([
-      fetch(`/api/applications/${id}`),
-      fetch(`/api/applications/${id}/generated`),
+    const [appData, generated] = await Promise.all([
+      apiFetch(`/api/applications/${id}`),
+      apiFetch(`/api/applications/${id}/generated`) as Promise<GeneratedContent[]>,
     ]);
-    setApplication(await appRes.json());
-    const generated: GeneratedContent[] = await genRes.json();
+    setApplication(appData);
     setCoverLetters(generated.filter((g) => g.type === "cover_letter"));
   }
 
   useEffect(() => {
     let ignore = false;
     (async () => {
-      const [appRes, genRes] = await Promise.all([
-        fetch(`/api/applications/${id}`),
-        fetch(`/api/applications/${id}/generated`),
+      const [appData, generated] = await Promise.all([
+        apiFetch(`/api/applications/${id}`),
+        apiFetch(`/api/applications/${id}/generated`) as Promise<GeneratedContent[]>,
       ]);
-      const appData = await appRes.json();
-      const generated: GeneratedContent[] = await genRes.json();
       if (!ignore) {
         setApplication(appData);
         setCoverLetters(generated.filter((g) => g.type === "cover_letter"));
@@ -60,17 +58,14 @@ export default function ApplicationDetailPage({
   async function handleGenerate() {
     setGenerating(true);
     setError("");
-    const res = await fetch(`/api/applications/${id}/generate/cover-letter`, {
-      method: "POST",
-    });
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error || "Something went wrong");
+    try {
+      await apiFetch(`/api/applications/${id}/generate/cover-letter`, { method: "POST" });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
       setGenerating(false);
-      return;
     }
-    await loadData();
-    setGenerating(false);
   }
 
   if (!application) return <p>Loading...</p>;

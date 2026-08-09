@@ -57,4 +57,4 @@ The frontend's `proxy.ts` does an optimistic cookie-presence check to redirect u
 ## Status
 
 - Auth (signup/login/logout/sessions) is fully migrated off Clerk and working end-to-end.
-- Resume and application CRUD, and cover letter generation, were originally built as Next.js API routes and still need to be ported into the Express backend (kept for reference under `backend/src/legacy-next-api/`). The frontend dashboard pages that call these are not yet wired to the new backend.
+- Resume and application CRUD, and cover letter generation, have been ported from the old Next.js API routes into the Express backend (`backend/src/routes/applications.ts`, `backend/src/routes/resumes.ts`), protected by `requireAuth`. The frontend dashboard pages now call these via `apiFetch` against the backend.
