@@ -35,6 +35,7 @@ export default function ApplicationDetailPage({
   const [notesDraft, setNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function loadData() {
     const [appData, generated] = await Promise.all([
@@ -95,6 +96,12 @@ export default function ApplicationDetailPage({
     } finally {
       setGenerating(false);
     }
+  }
+
+  async function handleCopy(text: string) {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   if (!application) return <p>Loading...</p>;
@@ -171,9 +178,17 @@ export default function ApplicationDetailPage({
         </button>
 
         {latestLetter && (
-          <div className="whitespace-pre-wrap text-sm border-t pt-4">
-            {latestLetter.content.coverLetter}
-          </div>
+          <>
+            <button
+              onClick={() => handleCopy(latestLetter.content.coverLetter)}
+              className="text-sm border rounded px-3 py-1 mb-4 ml-2"
+            >
+              {copied ? "Copied!" : "Copy"}
+            </button>
+            <div className="whitespace-pre-wrap text-sm border-t pt-4">
+              {latestLetter.content.coverLetter}
+            </div>
+          </>
         )}
       </div>
     </div>
