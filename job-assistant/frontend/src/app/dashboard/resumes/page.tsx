@@ -44,6 +44,14 @@ export default function ResumesPage() {
     await loadResumes();
   }
 
+  async function handleMarkPrimary(id: string) {
+    await apiFetch(`/api/resumes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ isPrimary: true }),
+    });
+    await loadResumes();
+  }
+
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-6">Resumes</h1>
@@ -76,12 +84,27 @@ export default function ResumesPage() {
         {resumes.map((r) => (
           <div key={r.id} className="border rounded p-4 flex justify-between items-start">
             <div>
-              <h3 className="font-semibold">{r.title}</h3>
+              <h3 className="font-semibold flex items-center gap-2">
+                {r.title}
+                {r.isPrimary && (
+                  <span className="text-xs bg-black text-white px-2 py-0.5 rounded">Primary</span>
+                )}
+              </h3>
               <p className="text-sm text-gray-500 line-clamp-2">{r.rawText}</p>
             </div>
-            <button onClick={() => handleDelete(r.id)} className="text-red-500 text-sm">
-              Delete
-            </button>
+            <div className="flex items-center gap-3 shrink-0">
+              {!r.isPrimary && (
+                <button
+                  onClick={() => handleMarkPrimary(r.id)}
+                  className="text-sm text-blue-600"
+                >
+                  Mark primary
+                </button>
+              )}
+              <button onClick={() => handleDelete(r.id)} className="text-red-500 text-sm">
+                Delete
+              </button>
+            </div>
           </div>
         ))}
       </div>

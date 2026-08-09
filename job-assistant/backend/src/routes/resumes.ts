@@ -55,7 +55,15 @@ resumesRouter.put("/:id", async (req, res) => {
   });
   if (!existing) return res.status(404).json({ error: "Not found" });
 
-  const updated = await prisma.resume.update({ where: { id: req.params.id }, data: parsed.data });
+  const updated = await prisma.$transaction(async (tx) => {
+    if (parsed.data.isPrimary === true) {
+      await tx.resume.updateMany({
+        where: { userId: req.user!.id, id: { not: req.params.id } },
+        data: { isPrimary: false },
+      });
+    }
+    return tx.resume.update({ where: { id: req.params.id }, data: parsed.data });
+  });
   res.json(updated);
 });
 
