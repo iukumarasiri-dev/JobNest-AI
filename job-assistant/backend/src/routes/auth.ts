@@ -1,8 +1,20 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../lib/db.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { createSession, destroySession, getUserFromRequest } from "../lib/session.js";
+import {
+  sendLoginNotificationEmail,
+  sendPasswordChangedEmail,
+  sendPasswordResetEmail,
+} from "../lib/mail.js";
+
+const RESET_TOKEN_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+function hashToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
 
 export const authRouter = Router();
 
@@ -52,6 +64,7 @@ authRouter.post("/login", async (req, res) => {
 
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession(res, user.id);
+  sendLoginNotificationEmail(user.email, user.name);
   res.json({ id: user.id, email: user.email, name: user.name });
 });
 
@@ -64,4 +77,65 @@ authRouter.get("/me", async (req, res) => {
   const user = await getUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Not authenticated" });
   res.json({ id: user.id, email: user.email, name: user.name });
+});
+
+const ForgotPasswordSchema = z.object({
+  email: z.email(),
+});
+
+authRouter.post("/forgot-password", async (req, res) => {
+  const parsed = ForgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const { email } = parsed.data;
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (user) {
+    const token = crypto.randomBytes(32).toString("hex");
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetTokenHash: hashToken(token),
+        resetTokenExpiresAt: new Date(Date.now() + RESET_TOKEN_DURATION_MS),
+      },
+    });
+
+    const resetUrl = `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/reset-password?token=${token}`;
+    sendPasswordResetEmail(user.email, resetUrl);
+  }
+
+  // Always respond the same way so we don't leak which emails are registered.
+  res.json({ message: "If that email is registered, a reset link has been sent." });
+});
+
+const ResetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8),
+});
+
+authRouter.post("/reset-password", async (req, res) => {
+  const parsed = ResetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const { token, password } = parsed.data;
+  const user = await prisma.user.findFirst({
+    where: { resetTokenHash: hashToken(token) },
+  });
+
+  if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+    return res.status(400).json({ error: "This reset link is invalid or has expired" });
+  }
+
+  const passwordHash = await hashPassword(password);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+  });
+
+  sendPasswordChangedEmail(user.email);
+  res.json({ success: true });
 });
