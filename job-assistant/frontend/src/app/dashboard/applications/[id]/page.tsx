@@ -3,12 +3,21 @@
 import { useEffect, useState, use } from "react";
 import { apiFetch } from "@/lib/api";
 
-type GeneratedContent = {
+type CoverLetterContent = {
   id: string;
-  type: string;
+  type: "cover_letter";
   content: { coverLetter: string; keyPointsUsed: string[] };
   createdAt: string;
 };
+
+type ResumeBulletsContent = {
+  id: string;
+  type: "resume_bullets";
+  content: { bullets: string[] };
+  createdAt: string;
+};
+
+type GeneratedContent = CoverLetterContent | ResumeBulletsContent;
 
 const STATUS_OPTIONS = ["wishlist", "applied", "interview", "offer", "rejected", "withdrawn"];
 
@@ -29,13 +38,17 @@ export default function ApplicationDetailPage({
 }) {
   const { id } = use(params);
   const [application, setApplication] = useState<Application | null>(null);
-  const [coverLetters, setCoverLetters] = useState<GeneratedContent[]>([]);
+  const [coverLetters, setCoverLetters] = useState<CoverLetterContent[]>([]);
+  const [bulletSets, setBulletSets] = useState<ResumeBulletsContent[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [generatingBullets, setGeneratingBullets] = useState(false);
   const [error, setError] = useState("");
+  const [bulletsError, setBulletsError] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedBullets, setCopiedBullets] = useState(false);
 
   async function loadData() {
     const [appData, generated] = await Promise.all([
@@ -44,7 +57,8 @@ export default function ApplicationDetailPage({
     ]);
     setApplication(appData);
     setNotesDraft(appData.notes ?? "");
-    setCoverLetters(generated.filter((g) => g.type === "cover_letter"));
+    setCoverLetters(generated.filter((g): g is CoverLetterContent => g.type === "cover_letter"));
+    setBulletSets(generated.filter((g): g is ResumeBulletsContent => g.type === "resume_bullets"));
   }
 
   useEffect(() => {
@@ -58,6 +72,7 @@ export default function ApplicationDetailPage({
         setApplication(appData);
         setNotesDraft(appData.notes ?? "");
         setCoverLetters(generated.filter((g) => g.type === "cover_letter"));
+        setBulletSets(generated.filter((g) => g.type === "resume_bullets"));
       }
     })();
     return () => {
@@ -104,9 +119,29 @@ export default function ApplicationDetailPage({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleGenerateBullets() {
+    setGeneratingBullets(true);
+    setBulletsError("");
+    try {
+      await apiFetch(`/api/applications/${id}/generate/resume-bullets`, { method: "POST" });
+      await loadData();
+    } catch (err) {
+      setBulletsError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setGeneratingBullets(false);
+    }
+  }
+
+  async function handleCopyBullets(bullets: string[]) {
+    await navigator.clipboard.writeText(bullets.map((b) => `- ${b}`).join("\n"));
+    setCopiedBullets(true);
+    setTimeout(() => setCopiedBullets(false), 2000);
+  }
+
   if (!application) return <p>Loading...</p>;
 
   const latestLetter = coverLetters[0];
+  const latestBullets = bulletSets[0];
 
   return (
     <div className="max-w-2xl">
@@ -188,6 +223,40 @@ export default function ApplicationDetailPage({
             <div className="whitespace-pre-wrap text-sm border-t pt-4">
               {latestLetter.content.coverLetter}
             </div>
+          </>
+        )}
+      </div>
+
+      <div className="border rounded p-4 mb-6">
+        <h2 className="font-semibold mb-2">Resume Bullet Points</h2>
+
+        {bulletsError && <p className="text-red-500 text-sm mb-2">{bulletsError}</p>}
+
+        <button
+          onClick={handleGenerateBullets}
+          disabled={generatingBullets}
+          className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50 mb-4"
+        >
+          {generatingBullets
+            ? "Generating..."
+            : latestBullets
+            ? "Regenerate Bullet Points"
+            : "Generate Bullet Points"}
+        </button>
+
+        {latestBullets && (
+          <>
+            <button
+              onClick={() => handleCopyBullets(latestBullets.content.bullets)}
+              className="text-sm border rounded px-3 py-1 mb-4 ml-2"
+            >
+              {copiedBullets ? "Copied!" : "Copy"}
+            </button>
+            <ul className="list-disc list-inside text-sm border-t pt-4 space-y-1">
+              {latestBullets.content.bullets.map((bullet, i) => (
+                <li key={i}>{bullet}</li>
+              ))}
+            </ul>
           </>
         )}
       </div>
