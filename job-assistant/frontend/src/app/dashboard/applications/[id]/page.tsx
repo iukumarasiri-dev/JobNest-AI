@@ -49,6 +49,8 @@ export default function ApplicationDetailPage({
   const [coverLetters, setCoverLetters] = useState<CoverLetterContent[]>([]);
   const [bulletSets, setBulletSets] = useState<ResumeBulletsContent[]>([]);
   const [skillsSets, setSkillsSets] = useState<SkillsMatchContent[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generatingBullets, setGeneratingBullets] = useState(false);
   const [generatingSkills, setGeneratingSkills] = useState(false);
@@ -58,7 +60,9 @@ export default function ApplicationDetailPage({
   const [notesDraft, setNotesDraft] = useState("");
   const [followUpDraft, setFollowUpDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+  const [notesError, setNotesError] = useState("");
   const [savingStatus, setSavingStatus] = useState(false);
+  const [statusError, setStatusError] = useState("");
   const [copied, setCopied] = useState(false);
   const [copiedBullets, setCopiedBullets] = useState(false);
 
@@ -75,45 +79,53 @@ export default function ApplicationDetailPage({
     setSkillsSets(generated.filter((g): g is SkillsMatchContent => g.type === "skills_analysis"));
   }
 
+  async function loadInitial() {
+    setPageLoading(true);
+    setLoadError("");
+    try {
+      await loadData();
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load this application.");
+    } finally {
+      setPageLoading(false);
+    }
+  }
+
   useEffect(() => {
-    let ignore = false;
-    (async () => {
-      const [appData, generated] = await Promise.all([
-        apiFetch(`/api/applications/${id}`),
-        apiFetch(`/api/applications/${id}/generated`) as Promise<GeneratedContent[]>,
-      ]);
-      if (!ignore) {
-        setApplication(appData);
-        setNotesDraft(appData.notes ?? "");
-        setFollowUpDraft(appData.followUpDate ? appData.followUpDate.slice(0, 10) : "");
-        setCoverLetters(generated.filter((g): g is CoverLetterContent => g.type === "cover_letter"));
-        setBulletSets(generated.filter((g): g is ResumeBulletsContent => g.type === "resume_bullets"));
-        setSkillsSets(generated.filter((g): g is SkillsMatchContent => g.type === "skills_analysis"));
-      }
-    })();
-    return () => {
-      ignore = true;
-    };
+    loadInitial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function handleStatusChange(status: string) {
     setSavingStatus(true);
-    await apiFetch(`/api/applications/${id}`, {
-      method: "PUT",
-      body: JSON.stringify({ status }),
-    });
-    await loadData();
-    setSavingStatus(false);
+    setStatusError("");
+    try {
+      await apiFetch(`/api/applications/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status }),
+      });
+      await loadData();
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : "Failed to update status.");
+    } finally {
+      setSavingStatus(false);
+    }
   }
 
   async function handleSaveNotes() {
     setSavingNotes(true);
-    await apiFetch(`/api/applications/${id}`, {
-      method: "PUT",
-      body: JSON.stringify({ notes: notesDraft, followUpDate: followUpDraft || null }),
-    });
-    await loadData();
-    setSavingNotes(false);
+    setNotesError("");
+    try {
+      await apiFetch(`/api/applications/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ notes: notesDraft, followUpDate: followUpDraft || null }),
+      });
+      await loadData();
+    } catch (err) {
+      setNotesError(err instanceof Error ? err.message : "Failed to save notes.");
+    } finally {
+      setSavingNotes(false);
+    }
   }
 
   async function handleGenerate() {
@@ -167,22 +179,50 @@ export default function ApplicationDetailPage({
     }
   }
 
-  if (!application) return <p>Loading...</p>;
+  if (pageLoading) {
+    return (
+      <div className="max-w-3xl space-y-4">
+        <div className="h-7 w-64 bg-muted rounded animate-pulse" />
+        <div className="h-4 w-40 bg-muted rounded animate-pulse" />
+        <div className="border border-border rounded p-4 space-y-3 animate-pulse">
+          <div className="h-4 w-24 bg-muted rounded" />
+          <div className="h-8 w-32 bg-muted rounded" />
+          <div className="h-4 w-full bg-muted rounded" />
+          <div className="h-4 w-2/3 bg-muted rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-3xl">
+        <div className="border border-destructive/30 bg-destructive/10 text-destructive rounded p-4 text-sm">
+          <p className="mb-2">{loadError}</p>
+          <button onClick={loadInitial} className="underline">
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!application) return null;
 
   const latestLetter = coverLetters[0];
   const latestBullets = bulletSets[0];
   const latestSkills = skillsSets[0];
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl">
       <h1 className="text-2xl font-bold">{application.jobTitle}</h1>
-      <p className="text-gray-500 mb-6">{application.companyName}</p>
+      <p className="text-muted-foreground mb-6">{application.companyName}</p>
 
-      <div className="border rounded p-4 mb-6 space-y-4">
+      <div className="border border-border rounded p-4 mb-6 space-y-4">
         <div>
           <h2 className="font-semibold mb-2">Status</h2>
           <select
-            className="border rounded p-2"
+            className="border border-border rounded p-2 bg-background"
             value={application.status}
             disabled={savingStatus}
             onChange={(e) => handleStatusChange(e.target.value)}
@@ -193,24 +233,25 @@ export default function ApplicationDetailPage({
               </option>
             ))}
           </select>
+          {statusError && <p className="text-sm text-destructive mt-2">{statusError}</p>}
         </div>
 
         <div>
           <h2 className="font-semibold mb-2">Resume attached</h2>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-foreground">
             {application.resume ? application.resume.title : "No resume attached"}
           </p>
         </div>
 
         <div>
           <h2 className="font-semibold mb-2">Job description</h2>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{application.jobDescription}</p>
+          <p className="text-sm text-foreground whitespace-pre-wrap">{application.jobDescription}</p>
         </div>
 
         <div>
           <h2 className="font-semibold mb-2">Notes</h2>
           <textarea
-            className="w-full border rounded p-2 h-28 text-sm"
+            className="w-full border border-border rounded p-2 h-28 text-sm bg-background"
             placeholder="Add notes about this application..."
             value={notesDraft}
             onChange={(e) => setNotesDraft(e.target.value)}
@@ -221,35 +262,39 @@ export default function ApplicationDetailPage({
           <h2 className="font-semibold mb-2 flex items-center gap-2">
             Follow-up date
             {followUpDraft && new Date(followUpDraft) < new Date(new Date().toDateString()) && (
-              <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">Overdue</span>
+              <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">
+                Overdue
+              </span>
             )}
           </h2>
           <input
             type="date"
-            className="border rounded p-2 text-sm"
+            className="border border-border rounded p-2 text-sm bg-background"
             value={followUpDraft}
             onChange={(e) => setFollowUpDraft(e.target.value)}
           />
         </div>
 
+        {notesError && <p className="text-sm text-destructive">{notesError}</p>}
+
         <button
           onClick={handleSaveNotes}
           disabled={savingNotes}
-          className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50"
+          className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm disabled:opacity-50"
         >
           {savingNotes ? "Saving..." : "Save"}
         </button>
       </div>
 
-      <div className="border rounded p-4 mb-6">
+      <div className="border border-border rounded p-4 mb-6">
         <h2 className="font-semibold mb-2">Cover Letter</h2>
 
-        {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
+        {error && <p className="text-sm text-destructive mb-2">{error}</p>}
 
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50 mb-4"
+          className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm disabled:opacity-50 mb-4"
         >
           {generating
             ? "Generating..."
@@ -262,26 +307,26 @@ export default function ApplicationDetailPage({
           <>
             <button
               onClick={() => handleCopy(latestLetter.content.coverLetter)}
-              className="text-sm border rounded px-3 py-1 mb-4 ml-2"
+              className="text-sm border border-border rounded px-3 py-1 mb-4 ml-2"
             >
               {copied ? "Copied!" : "Copy"}
             </button>
-            <div className="whitespace-pre-wrap text-sm border-t pt-4">
+            <div className="whitespace-pre-wrap text-sm border-t border-border pt-4">
               {latestLetter.content.coverLetter}
             </div>
           </>
         )}
       </div>
 
-      <div className="border rounded p-4 mb-6">
+      <div className="border border-border rounded p-4 mb-6">
         <h2 className="font-semibold mb-2">Resume Bullet Points</h2>
 
-        {bulletsError && <p className="text-red-500 text-sm mb-2">{bulletsError}</p>}
+        {bulletsError && <p className="text-sm text-destructive mb-2">{bulletsError}</p>}
 
         <button
           onClick={handleGenerateBullets}
           disabled={generatingBullets}
-          className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50 mb-4"
+          className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm disabled:opacity-50 mb-4"
         >
           {generatingBullets
             ? "Generating..."
@@ -294,11 +339,11 @@ export default function ApplicationDetailPage({
           <>
             <button
               onClick={() => handleCopyBullets(latestBullets.content.bullets)}
-              className="text-sm border rounded px-3 py-1 mb-4 ml-2"
+              className="text-sm border border-border rounded px-3 py-1 mb-4 ml-2"
             >
               {copiedBullets ? "Copied!" : "Copy"}
             </button>
-            <ul className="list-disc list-inside text-sm border-t pt-4 space-y-1">
+            <ul className="list-disc list-inside text-sm border-t border-border pt-4 space-y-1">
               {latestBullets.content.bullets.map((bullet, i) => (
                 <li key={i}>{bullet}</li>
               ))}
@@ -307,15 +352,15 @@ export default function ApplicationDetailPage({
         )}
       </div>
 
-      <div className="border rounded p-4 mb-6">
+      <div className="border border-border rounded p-4 mb-6">
         <h2 className="font-semibold mb-2">Skills Match</h2>
 
-        {skillsError && <p className="text-red-500 text-sm mb-2">{skillsError}</p>}
+        {skillsError && <p className="text-sm text-destructive mb-2">{skillsError}</p>}
 
         <button
           onClick={handleGenerateSkills}
           disabled={generatingSkills}
-          className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50 mb-4"
+          className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm disabled:opacity-50 mb-4"
         >
           {generatingSkills
             ? "Generating..."
@@ -325,17 +370,20 @@ export default function ApplicationDetailPage({
         </button>
 
         {latestSkills && (
-          <div className="border-t pt-4 space-y-4">
+          <div className="border-t border-border pt-4 space-y-4">
             <div>
               <h3 className="text-sm font-semibold mb-2">Matched</h3>
               <div className="flex flex-wrap gap-2">
                 {latestSkills.content.matched.map((skill, i) => (
-                  <span key={i} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                  <span
+                    key={i}
+                    className="text-xs bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 px-2 py-1 rounded"
+                  >
                     {skill}
                   </span>
                 ))}
                 {latestSkills.content.matched.length === 0 && (
-                  <span className="text-xs text-gray-400">None</span>
+                  <span className="text-xs text-muted-foreground">None</span>
                 )}
               </div>
             </div>
@@ -343,12 +391,15 @@ export default function ApplicationDetailPage({
               <h3 className="text-sm font-semibold mb-2">Partial</h3>
               <div className="flex flex-wrap gap-2">
                 {latestSkills.content.partial.map((skill, i) => (
-                  <span key={i} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                  <span
+                    key={i}
+                    className="text-xs bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 px-2 py-1 rounded"
+                  >
                     {skill}
                   </span>
                 ))}
                 {latestSkills.content.partial.length === 0 && (
-                  <span className="text-xs text-gray-400">None</span>
+                  <span className="text-xs text-muted-foreground">None</span>
                 )}
               </div>
             </div>
@@ -356,12 +407,15 @@ export default function ApplicationDetailPage({
               <h3 className="text-sm font-semibold mb-2">Missing</h3>
               <div className="flex flex-wrap gap-2">
                 {latestSkills.content.missing.map((skill, i) => (
-                  <span key={i} className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                  <span
+                    key={i}
+                    className="text-xs bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 px-2 py-1 rounded"
+                  >
                     {skill}
                   </span>
                 ))}
                 {latestSkills.content.missing.length === 0 && (
-                  <span className="text-xs text-gray-400">None</span>
+                  <span className="text-xs text-muted-foreground">None</span>
                 )}
               </div>
             </div>

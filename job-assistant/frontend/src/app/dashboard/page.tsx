@@ -12,23 +12,60 @@ type Application = {
 
 export default function DashboardPage() {
   const [applications, setApplications] = useState<Application[] | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await apiFetch("/api/applications");
+      setApplications(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load your dashboard.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let ignore = false;
-    (async () => {
-      const data = await apiFetch("/api/applications");
-      if (!ignore) setApplications(data);
-    })();
-    return () => {
-      ignore = true;
-    };
+    load();
   }, []);
 
-  if (!applications) return <p>Loading...</p>;
+  if (loading) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="border border-border rounded p-4 animate-pulse">
+              <div className="h-3 w-20 bg-muted rounded mb-2" />
+              <div className="h-6 w-10 bg-muted rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-  const total = applications.length;
+  if (error) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+        <div className="border border-destructive/30 bg-destructive/10 text-destructive rounded p-4 text-sm">
+          <p className="mb-2">{error}</p>
+          <button onClick={load} className="underline">
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const apps = applications ?? [];
+  const total = apps.length;
   const countByStatus = Object.fromEntries(
-    STATUS_OPTIONS.map((s) => [s, applications.filter((a) => a.status === s).length])
+    STATUS_OPTIONS.map((s) => [s, apps.filter((a) => a.status === s).length])
   );
 
   // "Responded" = employer gave any signal beyond silence: interview, offer, or rejected.
@@ -41,25 +78,25 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-        <div className="border rounded p-4">
-          <p className="text-xs text-gray-500 mb-1">Total Applications</p>
+        <div className="border border-border rounded p-4">
+          <p className="text-xs text-muted-foreground mb-1">Total Applications</p>
           <p className="text-2xl font-bold">{total}</p>
         </div>
-        <div className="border rounded p-4">
-          <p className="text-xs text-gray-500 mb-1">Response Rate</p>
+        <div className="border border-border rounded p-4">
+          <p className="text-xs text-muted-foreground mb-1">Response Rate</p>
           <p className="text-2xl font-bold">{responseRate === null ? "—" : `${responseRate}%`}</p>
-          <p className="text-xs text-gray-400 mt-1">of submitted apps with a reply</p>
+          <p className="text-xs text-muted-foreground mt-1">of submitted apps with a reply</p>
         </div>
         {STATUS_OPTIONS.map((s) => (
-          <div key={s} className="border rounded p-4">
-            <p className="text-xs text-gray-500 mb-1 capitalize">{s}</p>
+          <div key={s} className="border border-border rounded p-4">
+            <p className="text-xs text-muted-foreground mb-1 capitalize">{s}</p>
             <p className="text-2xl font-bold">{countByStatus[s]}</p>
           </div>
         ))}
       </div>
 
       {total === 0 && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           No applications yet. Head to{" "}
           <a href="/dashboard/applications" className="underline">
             Applications

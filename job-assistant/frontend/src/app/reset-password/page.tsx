@@ -110,7 +110,15 @@ export default function ResetPasswordPage() {
         <div className={styles.content}>
           <h1 className={styles.title}>Reset your password</h1>
 
-          <Suspense fallback={null}>
+          <Suspense
+            fallback={
+              <div className={styles.form}>
+                <div className="h-10 w-full bg-muted rounded animate-pulse" />
+                <div className="h-10 w-full bg-muted rounded animate-pulse" />
+                <div className="h-10 w-full bg-muted rounded-full animate-pulse" />
+              </div>
+            }
+          >
             <ResetPasswordForm />
           </Suspense>
 
