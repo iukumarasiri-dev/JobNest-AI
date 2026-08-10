@@ -17,7 +17,14 @@ type ResumeBulletsContent = {
   createdAt: string;
 };
 
-type GeneratedContent = CoverLetterContent | ResumeBulletsContent;
+type SkillsMatchContent = {
+  id: string;
+  type: "skills_analysis";
+  content: { matched: string[]; partial: string[]; missing: string[] };
+  createdAt: string;
+};
+
+type GeneratedContent = CoverLetterContent | ResumeBulletsContent | SkillsMatchContent;
 
 const STATUS_OPTIONS = ["wishlist", "applied", "interview", "offer", "rejected", "withdrawn"];
 
@@ -40,10 +47,13 @@ export default function ApplicationDetailPage({
   const [application, setApplication] = useState<Application | null>(null);
   const [coverLetters, setCoverLetters] = useState<CoverLetterContent[]>([]);
   const [bulletSets, setBulletSets] = useState<ResumeBulletsContent[]>([]);
+  const [skillsSets, setSkillsSets] = useState<SkillsMatchContent[]>([]);
   const [generating, setGenerating] = useState(false);
   const [generatingBullets, setGeneratingBullets] = useState(false);
+  const [generatingSkills, setGeneratingSkills] = useState(false);
   const [error, setError] = useState("");
   const [bulletsError, setBulletsError] = useState("");
+  const [skillsError, setSkillsError] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
@@ -59,6 +69,7 @@ export default function ApplicationDetailPage({
     setNotesDraft(appData.notes ?? "");
     setCoverLetters(generated.filter((g): g is CoverLetterContent => g.type === "cover_letter"));
     setBulletSets(generated.filter((g): g is ResumeBulletsContent => g.type === "resume_bullets"));
+    setSkillsSets(generated.filter((g): g is SkillsMatchContent => g.type === "skills_analysis"));
   }
 
   useEffect(() => {
@@ -71,8 +82,9 @@ export default function ApplicationDetailPage({
       if (!ignore) {
         setApplication(appData);
         setNotesDraft(appData.notes ?? "");
-        setCoverLetters(generated.filter((g) => g.type === "cover_letter"));
-        setBulletSets(generated.filter((g) => g.type === "resume_bullets"));
+        setCoverLetters(generated.filter((g): g is CoverLetterContent => g.type === "cover_letter"));
+        setBulletSets(generated.filter((g): g is ResumeBulletsContent => g.type === "resume_bullets"));
+        setSkillsSets(generated.filter((g): g is SkillsMatchContent => g.type === "skills_analysis"));
       }
     })();
     return () => {
@@ -138,10 +150,24 @@ export default function ApplicationDetailPage({
     setTimeout(() => setCopiedBullets(false), 2000);
   }
 
+  async function handleGenerateSkills() {
+    setGeneratingSkills(true);
+    setSkillsError("");
+    try {
+      await apiFetch(`/api/applications/${id}/generate/skills-match`, { method: "POST" });
+      await loadData();
+    } catch (err) {
+      setSkillsError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setGeneratingSkills(false);
+    }
+  }
+
   if (!application) return <p>Loading...</p>;
 
   const latestLetter = coverLetters[0];
   const latestBullets = bulletSets[0];
+  const latestSkills = skillsSets[0];
 
   return (
     <div className="max-w-2xl">
@@ -258,6 +284,68 @@ export default function ApplicationDetailPage({
               ))}
             </ul>
           </>
+        )}
+      </div>
+
+      <div className="border rounded p-4 mb-6">
+        <h2 className="font-semibold mb-2">Skills Match</h2>
+
+        {skillsError && <p className="text-red-500 text-sm mb-2">{skillsError}</p>}
+
+        <button
+          onClick={handleGenerateSkills}
+          disabled={generatingSkills}
+          className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50 mb-4"
+        >
+          {generatingSkills
+            ? "Generating..."
+            : latestSkills
+            ? "Regenerate Skills Match"
+            : "Generate Skills Match"}
+        </button>
+
+        {latestSkills && (
+          <div className="border-t pt-4 space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Matched</h3>
+              <div className="flex flex-wrap gap-2">
+                {latestSkills.content.matched.map((skill, i) => (
+                  <span key={i} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                    {skill}
+                  </span>
+                ))}
+                {latestSkills.content.matched.length === 0 && (
+                  <span className="text-xs text-gray-400">None</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Partial</h3>
+              <div className="flex flex-wrap gap-2">
+                {latestSkills.content.partial.map((skill, i) => (
+                  <span key={i} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                    {skill}
+                  </span>
+                ))}
+                {latestSkills.content.partial.length === 0 && (
+                  <span className="text-xs text-gray-400">None</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Missing</h3>
+              <div className="flex flex-wrap gap-2">
+                {latestSkills.content.missing.map((skill, i) => (
+                  <span key={i} className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                    {skill}
+                  </span>
+                ))}
+                {latestSkills.content.missing.length === 0 && (
+                  <span className="text-xs text-gray-400">None</span>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
