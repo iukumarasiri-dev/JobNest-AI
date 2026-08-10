@@ -35,6 +35,7 @@ type Application = {
   jobDescription: string;
   status: string;
   notes: string | null;
+  followUpDate: string | null;
   resume: { title: string } | null;
 };
 
@@ -55,6 +56,7 @@ export default function ApplicationDetailPage({
   const [bulletsError, setBulletsError] = useState("");
   const [skillsError, setSkillsError] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
+  const [followUpDraft, setFollowUpDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -67,6 +69,7 @@ export default function ApplicationDetailPage({
     ]);
     setApplication(appData);
     setNotesDraft(appData.notes ?? "");
+    setFollowUpDraft(appData.followUpDate ? appData.followUpDate.slice(0, 10) : "");
     setCoverLetters(generated.filter((g): g is CoverLetterContent => g.type === "cover_letter"));
     setBulletSets(generated.filter((g): g is ResumeBulletsContent => g.type === "resume_bullets"));
     setSkillsSets(generated.filter((g): g is SkillsMatchContent => g.type === "skills_analysis"));
@@ -82,6 +85,7 @@ export default function ApplicationDetailPage({
       if (!ignore) {
         setApplication(appData);
         setNotesDraft(appData.notes ?? "");
+        setFollowUpDraft(appData.followUpDate ? appData.followUpDate.slice(0, 10) : "");
         setCoverLetters(generated.filter((g): g is CoverLetterContent => g.type === "cover_letter"));
         setBulletSets(generated.filter((g): g is ResumeBulletsContent => g.type === "resume_bullets"));
         setSkillsSets(generated.filter((g): g is SkillsMatchContent => g.type === "skills_analysis"));
@@ -106,7 +110,7 @@ export default function ApplicationDetailPage({
     setSavingNotes(true);
     await apiFetch(`/api/applications/${id}`, {
       method: "PUT",
-      body: JSON.stringify({ notes: notesDraft }),
+      body: JSON.stringify({ notes: notesDraft, followUpDate: followUpDraft || null }),
     });
     await loadData();
     setSavingNotes(false);
@@ -211,14 +215,30 @@ export default function ApplicationDetailPage({
             value={notesDraft}
             onChange={(e) => setNotesDraft(e.target.value)}
           />
-          <button
-            onClick={handleSaveNotes}
-            disabled={savingNotes}
-            className="mt-2 bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50"
-          >
-            {savingNotes ? "Saving..." : "Save Notes"}
-          </button>
         </div>
+
+        <div>
+          <h2 className="font-semibold mb-2 flex items-center gap-2">
+            Follow-up date
+            {followUpDraft && new Date(followUpDraft) < new Date(new Date().toDateString()) && (
+              <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">Overdue</span>
+            )}
+          </h2>
+          <input
+            type="date"
+            className="border rounded p-2 text-sm"
+            value={followUpDraft}
+            onChange={(e) => setFollowUpDraft(e.target.value)}
+          />
+        </div>
+
+        <button
+          onClick={handleSaveNotes}
+          disabled={savingNotes}
+          className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50"
+        >
+          {savingNotes ? "Saving..." : "Save"}
+        </button>
       </div>
 
       <div className="border rounded p-4 mb-6">

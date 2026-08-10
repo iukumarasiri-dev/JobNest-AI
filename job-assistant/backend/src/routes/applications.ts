@@ -27,6 +27,7 @@ const updateSchema = z.object({
   status: z.enum(["wishlist", "applied", "interview", "offer", "rejected", "withdrawn"]).optional(),
   notes: z.string().optional(),
   appliedDate: z.string().datetime().optional(),
+  followUpDate: z.string().nullable().optional(),
   location: z.string().optional(),
   salaryRange: z.string().optional(),
   jobUrl: z.string().optional(),
@@ -78,6 +79,12 @@ applicationsRouter.put("/:id", async (req, res) => {
     data: {
       ...parsed.data,
       appliedDate: parsed.data.appliedDate ? new Date(parsed.data.appliedDate) : undefined,
+      followUpDate:
+        parsed.data.followUpDate === undefined
+          ? undefined
+          : parsed.data.followUpDate
+          ? new Date(parsed.data.followUpDate)
+          : null,
     },
   });
   res.json(updated);

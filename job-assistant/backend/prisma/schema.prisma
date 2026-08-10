@@ -56,6 +56,7 @@ model Application {
   jobDescription  String
   status          String   @default("wishlist")
   appliedDate     DateTime?
+  followUpDate    DateTime?
   notes           String?
   location        String?
   salaryRange     String?
