@@ -1,0 +1,27 @@
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import { prisma } from "./lib/db.js";
+import { authRouter } from "./routes/auth.js";
+import { applicationsRouter } from "./routes/applications.js";
+import { resumesRouter } from "./routes/resumes.js";
+
+export const app = express();
+
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL ?? "http://localhost:3000",
+    credentials: true,
+  })
+);
+app.use(express.json());
+app.use(cookieParser());
+
+app.get("/health", async (_req, res) => {
+  const userCount = await prisma.user.count();
+  res.json({ status: "ok", userCount });
+});
+
+app.use("/api/auth", authRouter);
+app.use("/api/applications", applicationsRouter);
+app.use("/api/resumes", resumesRouter);

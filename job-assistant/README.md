@@ -38,6 +38,28 @@ npm run dev
 
 Runs on [http://localhost:4000](http://localhost:4000). Requires a `.env` file with `DATABASE_URL`, `DIRECT_URL`, `GROQ_API_KEY`, `PORT`, and `FRONTEND_URL`.
 
+#### Tests
+
+```bash
+cd backend
+npm test          # run once
+npm run test:watch
+```
+
+Integration tests (Vitest + Supertest) drive the real Express app (`src/app.ts`) over HTTP against a real database — they are not mocked at the Prisma layer. Email (`lib/mail.ts`) and the Groq client (`lib/ai/client.ts`) are mocked so tests don't hit real third parties.
+
+They **require a database separate from your dev `.env`**, because tables are truncated between tests. Set it up once:
+
+1. Create a second Postgres database — e.g. a Neon branch off your dev branch (Neon dashboard → Branches → New Branch).
+2. Create `backend/.env.test` with that branch's connection strings:
+   ```
+   DATABASE_URL=postgresql://...
+   DIRECT_URL=postgresql://...
+   ```
+3. Run `npm test`. The global setup applies pending migrations to it automatically and refuses to run if `.env.test` is missing or matches `.env`.
+
+`.env.test` is gitignored like the other env files.
+
 ### Frontend
 
 ```bash
