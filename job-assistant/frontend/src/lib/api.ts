@@ -15,3 +15,18 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   }
   return data;
 }
+
+// For multipart/form-data uploads — no Content-Type header, so the browser
+// can set it with the correct multipart boundary.
+export async function apiUpload(path: string, formData: FormData) {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error?.formErrors?.[0] ?? data?.error ?? "Upload failed");
+  }
+  return data;
+}
