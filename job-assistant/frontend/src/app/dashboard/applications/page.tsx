@@ -25,6 +25,7 @@ export default function ApplicationsPage() {
   const [companyName, setCompanyName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [jobUrl, setJobUrl] = useState("");
   const [resumeId, setResumeId] = useState("");
   const [loading, setLoading] = useState(false);
   const [savingStatusId, setSavingStatusId] = useState<string | null>(null);
@@ -32,6 +33,9 @@ export default function ApplicationsPage() {
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState("");
+  const [extractNotice, setExtractNotice] = useState("");
 
   async function loadAll() {
     setPageLoading(true);
@@ -70,17 +74,43 @@ export default function ApplicationsPage() {
           jobTitle,
           jobDescription,
           resumeId: resumeId || undefined,
+          jobUrl: jobUrl || undefined,
         }),
       });
       setCompanyName("");
       setJobTitle("");
       setJobDescription("");
+      setJobUrl("");
       setResumeId("");
       await loadApplications();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to add application.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleExtract() {
+    if (!jobUrl.trim()) {
+      setExtractError("Paste a job posting URL first.");
+      return;
+    }
+    setExtracting(true);
+    setExtractError("");
+    setExtractNotice("");
+    try {
+      const data = await apiFetch("/api/applications/extract-job", {
+        method: "POST",
+        body: JSON.stringify({ url: jobUrl.trim() }),
+      });
+      if (data.jobTitle) setJobTitle(data.jobTitle);
+      if (data.companyName) setCompanyName(data.companyName);
+      if (data.jobDescription) setJobDescription(data.jobDescription);
+      setExtractNotice("Filled in from the job posting. Review the fields below before saving.");
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : "Failed to fetch this job posting.");
+    } finally {
+      setExtracting(false);
     }
   }
 
@@ -115,6 +145,32 @@ export default function ApplicationsPage() {
       <h1 className="text-2xl font-bold mb-6">Applications</h1>
 
       <form onSubmit={handleSubmit} className="space-y-3 mb-8 border border-border p-4 rounded-lg">
+        <div>
+          <label className="text-sm text-muted-foreground mb-1 block">
+            Job posting URL (optional)
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              className="flex-1 border border-border rounded p-2 bg-background"
+              placeholder="https://company.com/careers/job-123"
+              value={jobUrl}
+              onChange={(e) => setJobUrl(e.target.value)}
+              type="url"
+            />
+            <button
+              type="button"
+              onClick={handleExtract}
+              disabled={extracting}
+              className="border border-border rounded px-4 py-2 text-sm disabled:opacity-50 whitespace-nowrap"
+            >
+              {extracting ? "Fetching..." : "Fetch from URL"}
+            </button>
+          </div>
+          {extractError && <p className="text-sm text-destructive mt-1">{extractError}</p>}
+          {extractNotice && !extractError && (
+            <p className="text-sm text-muted-foreground mt-1">{extractNotice}</p>
+          )}
+        </div>
         <input
           className="w-full border border-border rounded p-2 bg-background"
           placeholder="Company name"
