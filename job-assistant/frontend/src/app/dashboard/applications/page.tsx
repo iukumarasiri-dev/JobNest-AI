@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 const STATUS_OPTIONS = ["wishlist", "applied", "interview", "offer", "rejected", "withdrawn"];
@@ -11,6 +11,7 @@ type Application = {
   jobTitle: string;
   jobDescription: string;
   status: string;
+  createdAt: string;
   resume: { id: string; title: string } | null;
 };
 
@@ -36,6 +37,12 @@ export default function ApplicationsPage() {
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState("");
   const [extractNotice, setExtractNotice] = useState("");
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
 
   async function loadAll() {
     setPageLoading(true);
@@ -139,6 +146,48 @@ export default function ApplicationsPage() {
       setSavingStatusId(null);
     }
   }
+
+  const hasActiveFilters = Boolean(search || statusFilter || dateFrom || dateTo);
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("");
+    setDateFrom("");
+    setDateTo("");
+  }
+
+  const visibleApplications = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? new Date(dateTo) : null;
+    if (to) to.setHours(23, 59, 59, 999);
+
+    const filtered = applications.filter((a) => {
+      if (query) {
+        const haystack = `${a.companyName} ${a.jobTitle}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      if (statusFilter && a.status !== statusFilter) return false;
+      const created = new Date(a.createdAt);
+      if (from && created < from) return false;
+      if (to && created > to) return false;
+      return true;
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "oldest":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "company":
+          return a.companyName.localeCompare(b.companyName);
+        case "newest":
+        default:
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    });
+
+    return sorted;
+  }, [applications, search, statusFilter, dateFrom, dateTo, sortBy]);
 
   return (
     <div className="max-w-3xl">
@@ -249,8 +298,83 @@ export default function ApplicationsPage() {
       )}
 
       {!pageLoading && !loadError && applications.length > 0 && (
+        <div className="mb-4 border border-border rounded-lg p-4 flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              className="flex-1 border border-border rounded p-2 bg-background text-sm"
+              placeholder="Search by company or job title..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select
+              className="border border-border rounded p-2 bg-background text-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <select
+              className="border border-border rounded p-2 bg-background text-sm"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="company">Company (A-Z)</option>
+            </select>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <label className="text-sm text-muted-foreground flex items-center gap-2">
+              From
+              <input
+                type="date"
+                className="border border-border rounded p-2 bg-background text-sm"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </label>
+            <label className="text-sm text-muted-foreground flex items-center gap-2">
+              To
+              <input
+                type="date"
+                className="border border-border rounded p-2 bg-background text-sm"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </label>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-sm underline text-muted-foreground self-start sm:self-auto"
+              >
+                Clear filters
+              </button>
+            )}
+            <span className="text-xs text-muted-foreground sm:ml-auto">
+              Showing {visibleApplications.length} of {applications.length}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {!pageLoading && !loadError && applications.length > 0 && visibleApplications.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          No applications match your filters.{" "}
+          <button type="button" onClick={clearFilters} className="underline">
+            Clear filters
+          </button>
+        </p>
+      )}
+
+      {!pageLoading && !loadError && visibleApplications.length > 0 && (
         <div className="space-y-3">
-          {applications.map((a) => (
+          {visibleApplications.map((a) => (
             <div
               key={a.id}
               className="border border-border rounded p-4 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2"
