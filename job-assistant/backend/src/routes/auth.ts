@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../lib/db.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { createSession, destroySession, getUserFromRequest } from "../lib/session.js";
+import { requireAuth } from "../middleware/requireAuth.js";
 import {
   sendLoginNotificationEmail,
   sendPasswordChangedEmail,
@@ -77,6 +78,47 @@ authRouter.get("/me", async (req, res) => {
   const user = await getUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Not authenticated" });
   res.json({ id: user.id, email: user.email, name: user.name });
+});
+
+const UpdateProfileSchema = z.object({
+  name: z.string().min(1).max(120),
+});
+
+authRouter.patch("/me", requireAuth, async (req, res) => {
+  const parsed = UpdateProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const user = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { name: parsed.data.name },
+  });
+
+  res.json({ id: user.id, email: user.email, name: user.name });
+});
+
+const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+authRouter.post("/change-password", requireAuth, async (req, res) => {
+  const parsed = ChangePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const { currentPassword, newPassword } = parsed.data;
+  const user = req.user!;
+  if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+    return res.status(401).json({ error: "Current password is incorrect" });
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  sendPasswordChangedEmail(user.email);
+  res.json({ success: true });
 });
 
 const ForgotPasswordSchema = z.object({
