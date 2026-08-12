@@ -1,4 +1,5 @@
 import { Router } from "express";
+import dns from "node:dns/promises";
 import { z } from "zod";
 import { prisma } from "../lib/db.js";
 import { requireAuth } from "../middleware/requireAuth.js";
@@ -7,6 +8,9 @@ import { buildCoverLetterPrompt } from "../lib/ai/prompts/coverLetter.js";
 import { buildResumeBulletsPrompt } from "../lib/ai/prompts/resumeBullets.js";
 import { buildSkillsMatchPrompt } from "../lib/ai/prompts/skillsMatch.js";
 import { buildInterviewQuestionsPrompt } from "../lib/ai/prompts/interviewQuestions.js";
+import { buildExtractJobPostingPrompt } from "../lib/ai/prompts/extractJobPosting.js";
+import { htmlToText } from "../lib/htmlToText.js";
+import { isPrivateAddress } from "../lib/security/ssrf.js";
 
 export const applicationsRouter = Router();
 applicationsRouter.use(requireAuth);
@@ -53,6 +57,122 @@ applicationsRouter.post("/", async (req, res) => {
     data: { ...parsed.data, userId: req.user!.id },
   });
   res.status(201).json(application);
+});
+
+const extractJobSchema = z.object({ url: z.string().url() });
+
+applicationsRouter.post("/extract-job", async (req, res) => {
+  const parsed = extractJobSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  let url: URL;
+  try {
+    url = new URL(parsed.data.url);
+  } catch {
+    return res.status(400).json({ error: "Invalid URL." });
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return res.status(400).json({ error: "Only http and https URLs are supported." });
+  }
+
+  try {
+    const addresses = await dns.lookup(url.hostname, { all: true });
+    if (addresses.length === 0 || addresses.some((a) => isPrivateAddress(a.address))) {
+      return res.status(400).json({ error: "This URL cannot be fetched." });
+    }
+  } catch {
+    return res.status(400).json({ error: "Could not resolve this URL's host." });
+  }
+
+  let html: string;
+  try {
+    const response = await fetch(url.toString(), {
+      redirect: "manual",
+      signal: AbortSignal.timeout(10000),
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; JobNestAI/1.0)" },
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      return res.status(400).json({
+        error: "This URL redirects to another page. Please paste the final job posting URL directly.",
+      });
+    }
+
+    if (!response.ok) {
+      return res.status(400).json({ error: `Failed to fetch this URL (status ${response.status}).` });
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("text/html") && !contentType.includes("text/plain")) {
+      return res.status(400).json({ error: "This URL does not point to a readable web page." });
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body");
+
+    const MAX_BYTES = 2 * 1024 * 1024;
+    let received = 0;
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.length;
+      chunks.push(value);
+      if (received > MAX_BYTES) {
+        await reader.cancel();
+        break;
+      }
+    }
+    html = Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf-8");
+  } catch (err) {
+    console.error("Job posting fetch failed:", err);
+    return res.status(502).json({
+      error: "Failed to fetch this URL. Please check the link or paste the job description manually.",
+    });
+  }
+
+  const pageText = htmlToText(html).slice(0, 15000);
+  if (!pageText.trim()) {
+    return res.status(422).json({ error: "Couldn't extract any readable text from this page." });
+  }
+
+  const prompt = buildExtractJobPostingPrompt({ pageText });
+
+  let parsedJob: { jobTitle: string; companyName: string; jobDescription: string; location?: string };
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+    });
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty response from model");
+
+    parsedJob = JSON.parse(raw);
+
+    if (typeof parsedJob.jobDescription !== "string") {
+      throw new Error("Malformed response: missing jobDescription field");
+    }
+  } catch (err) {
+    console.error("Job posting extraction failed:", err);
+    return res.status(502).json({
+      error: "Failed to extract job details from this page. Please fill the form manually.",
+    });
+  }
+
+  if (!parsedJob.jobDescription.trim()) {
+    return res.status(422).json({
+      error: "Couldn't find a job posting on this page. Please fill the form manually.",
+    });
+  }
+
+  res.json(parsedJob);
 });
 
 applicationsRouter.get("/:id", async (req, res) => {
