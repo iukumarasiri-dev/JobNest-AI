@@ -6,6 +6,7 @@ import { groq } from "../lib/ai/client.js";
 import { buildCoverLetterPrompt } from "../lib/ai/prompts/coverLetter.js";
 import { buildResumeBulletsPrompt } from "../lib/ai/prompts/resumeBullets.js";
 import { buildSkillsMatchPrompt } from "../lib/ai/prompts/skillsMatch.js";
+import { buildInterviewQuestionsPrompt } from "../lib/ai/prompts/interviewQuestions.js";
 
 export const applicationsRouter = Router();
 applicationsRouter.use(requireAuth);
@@ -285,6 +286,65 @@ applicationsRouter.post("/:id/generate/skills-match", async (req, res) => {
     data: {
       applicationId: application.id,
       type: "skills_analysis",
+      content: parsed,
+      modelUsed: "llama-3.3-70b-versatile",
+      promptVersion: "v1",
+    },
+  });
+
+  res.status(201).json(saved);
+});
+
+applicationsRouter.post("/:id/generate/interview-questions", async (req, res) => {
+  const application = await prisma.application.findFirst({
+    where: { id: req.params.id, userId: req.user!.id },
+    include: { resume: true },
+  });
+
+  if (!application) {
+    return res.status(404).json({ error: "Application not found" });
+  }
+
+  if (!application.resume?.rawText) {
+    return res.status(400).json({
+      error: "This application has no resume attached. Attach a resume first.",
+    });
+  }
+
+  const prompt = buildInterviewQuestionsPrompt({
+    jobTitle: application.jobTitle,
+    companyName: application.companyName,
+    jobDescription: application.jobDescription,
+    resumeText: application.resume.rawText,
+  });
+
+  let parsed: { questions: { question: string; tip: string }[] };
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty response from model");
+
+    parsed = JSON.parse(raw);
+
+    if (!Array.isArray(parsed.questions) || parsed.questions.length === 0) {
+      throw new Error("Malformed response: missing questions array");
+    }
+  } catch (err) {
+    console.error("Interview questions generation failed:", err);
+    return res.status(502).json({ error: "Failed to generate interview questions. Please try again." });
+  }
+
+  const saved = await prisma.generatedContent.create({
+    data: {
+      applicationId: application.id,
+      type: "interview_questions",
       content: parsed,
       modelUsed: "llama-3.3-70b-versatile",
       promptVersion: "v1",

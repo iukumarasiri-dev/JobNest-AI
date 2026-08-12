@@ -24,7 +24,18 @@ type SkillsMatchContent = {
   createdAt: string;
 };
 
-type GeneratedContent = CoverLetterContent | ResumeBulletsContent | SkillsMatchContent;
+type InterviewQuestionsContent = {
+  id: string;
+  type: "interview_questions";
+  content: { questions: { question: string; tip: string }[] };
+  createdAt: string;
+};
+
+type GeneratedContent =
+  | CoverLetterContent
+  | ResumeBulletsContent
+  | SkillsMatchContent
+  | InterviewQuestionsContent;
 
 const STATUS_OPTIONS = ["wishlist", "applied", "interview", "offer", "rejected", "withdrawn"];
 
@@ -49,14 +60,17 @@ export default function ApplicationDetailPage({
   const [coverLetters, setCoverLetters] = useState<CoverLetterContent[]>([]);
   const [bulletSets, setBulletSets] = useState<ResumeBulletsContent[]>([]);
   const [skillsSets, setSkillsSets] = useState<SkillsMatchContent[]>([]);
+  const [interviewQuestionSets, setInterviewQuestionSets] = useState<InterviewQuestionsContent[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generatingBullets, setGeneratingBullets] = useState(false);
   const [generatingSkills, setGeneratingSkills] = useState(false);
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
   const [error, setError] = useState("");
   const [bulletsError, setBulletsError] = useState("");
   const [skillsError, setSkillsError] = useState("");
+  const [questionsError, setQuestionsError] = useState("");
   const [notesDraft, setNotesDraft] = useState("");
   const [followUpDraft, setFollowUpDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
@@ -65,6 +79,7 @@ export default function ApplicationDetailPage({
   const [statusError, setStatusError] = useState("");
   const [copied, setCopied] = useState(false);
   const [copiedBullets, setCopiedBullets] = useState(false);
+  const [copiedQuestions, setCopiedQuestions] = useState(false);
 
   async function loadData() {
     const [appData, generated] = await Promise.all([
@@ -77,6 +92,9 @@ export default function ApplicationDetailPage({
     setCoverLetters(generated.filter((g): g is CoverLetterContent => g.type === "cover_letter"));
     setBulletSets(generated.filter((g): g is ResumeBulletsContent => g.type === "resume_bullets"));
     setSkillsSets(generated.filter((g): g is SkillsMatchContent => g.type === "skills_analysis"));
+    setInterviewQuestionSets(
+      generated.filter((g): g is InterviewQuestionsContent => g.type === "interview_questions")
+    );
   }
 
   async function loadInitial() {
@@ -179,6 +197,27 @@ export default function ApplicationDetailPage({
     }
   }
 
+  async function handleGenerateQuestions() {
+    setGeneratingQuestions(true);
+    setQuestionsError("");
+    try {
+      await apiFetch(`/api/applications/${id}/generate/interview-questions`, { method: "POST" });
+      await loadData();
+    } catch (err) {
+      setQuestionsError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  }
+
+  async function handleCopyQuestions(questions: { question: string; tip: string }[]) {
+    await navigator.clipboard.writeText(
+      questions.map((q) => `Q: ${q.question}\nTip: ${q.tip}`).join("\n\n")
+    );
+    setCopiedQuestions(true);
+    setTimeout(() => setCopiedQuestions(false), 2000);
+  }
+
   if (pageLoading) {
     return (
       <div className="max-w-3xl space-y-4">
@@ -212,6 +251,7 @@ export default function ApplicationDetailPage({
   const latestLetter = coverLetters[0];
   const latestBullets = bulletSets[0];
   const latestSkills = skillsSets[0];
+  const latestQuestions = interviewQuestionSets[0];
 
   return (
     <div className="max-w-3xl">
@@ -420,6 +460,43 @@ export default function ApplicationDetailPage({
               </div>
             </div>
           </div>
+        )}
+      </div>
+
+      <div className="border border-border rounded p-4 mb-6">
+        <h2 className="font-semibold mb-2">Interview Questions</h2>
+
+        {questionsError && <p className="text-sm text-destructive mb-2">{questionsError}</p>}
+
+        <button
+          onClick={handleGenerateQuestions}
+          disabled={generatingQuestions}
+          className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm disabled:opacity-50 mb-4"
+        >
+          {generatingQuestions
+            ? "Generating..."
+            : latestQuestions
+            ? "Regenerate Interview Questions"
+            : "Generate Interview Questions"}
+        </button>
+
+        {latestQuestions && (
+          <>
+            <button
+              onClick={() => handleCopyQuestions(latestQuestions.content.questions)}
+              className="text-sm border border-border rounded px-3 py-1 mb-4 ml-2"
+            >
+              {copiedQuestions ? "Copied!" : "Copy"}
+            </button>
+            <ul className="text-sm border-t border-border pt-4 space-y-4">
+              {latestQuestions.content.questions.map((q, i) => (
+                <li key={i}>
+                  <p className="font-medium">{q.question}</p>
+                  <p className="text-muted-foreground mt-1">{q.tip}</p>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </div>
