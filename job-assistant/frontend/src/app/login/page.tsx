@@ -45,11 +45,11 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      await apiFetch("/api/auth/login", {
+      const data = await apiFetch("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email: formData.identifier, password: formData.password }),
       });
-      router.push("/dashboard");
+      router.push(data.role === "EMPLOYER" ? "/dashboard/company" : "/dashboard");
       router.refresh();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong" });
