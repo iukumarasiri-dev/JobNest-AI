@@ -71,13 +71,15 @@ export function useApplicationDetail(id: string) {
   async function handleStatusChange(status: string) {
     setSavingStatus(true);
     setStatusError("");
+    const previous = application;
+    setApplication((prev) => (prev ? { ...prev, status } : prev));
     try {
       await apiFetch(`/api/applications/${id}`, {
         method: "PUT",
         body: JSON.stringify({ status }),
       });
-      await loadData();
     } catch (err) {
+      setApplication(previous);
       setStatusError(err instanceof Error ? err.message : "Failed to update status.");
     } finally {
       setSavingStatus(false);
@@ -92,7 +94,9 @@ export function useApplicationDetail(id: string) {
         method: "PUT",
         body: JSON.stringify({ notes: notesDraft, followUpDate: followUpDraft || null }),
       });
-      await loadData();
+      setApplication((prev) =>
+        prev ? { ...prev, notes: notesDraft, followUpDate: followUpDraft || null } : prev
+      );
     } catch (err) {
       setNotesError(err instanceof Error ? err.message : "Failed to save notes.");
     } finally {
@@ -104,8 +108,10 @@ export function useApplicationDetail(id: string) {
     setGenerating(true);
     setError("");
     try {
-      await apiFetch(`/api/applications/${id}/generate/cover-letter`, { method: "POST" });
-      await loadData();
+      const created: CoverLetterContent = await apiFetch(`/api/applications/${id}/generate/cover-letter`, {
+        method: "POST",
+      });
+      setCoverLetters((prev) => [created, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -123,8 +129,10 @@ export function useApplicationDetail(id: string) {
     setGeneratingBullets(true);
     setBulletsError("");
     try {
-      await apiFetch(`/api/applications/${id}/generate/resume-bullets`, { method: "POST" });
-      await loadData();
+      const created: ResumeBulletsContent = await apiFetch(`/api/applications/${id}/generate/resume-bullets`, {
+        method: "POST",
+      });
+      setBulletSets((prev) => [created, ...prev]);
     } catch (err) {
       setBulletsError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -142,8 +150,10 @@ export function useApplicationDetail(id: string) {
     setGeneratingSkills(true);
     setSkillsError("");
     try {
-      await apiFetch(`/api/applications/${id}/generate/skills-match`, { method: "POST" });
-      await loadData();
+      const created: SkillsMatchContent = await apiFetch(`/api/applications/${id}/generate/skills-match`, {
+        method: "POST",
+      });
+      setSkillsSets((prev) => [created, ...prev]);
     } catch (err) {
       setSkillsError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -155,8 +165,11 @@ export function useApplicationDetail(id: string) {
     setGeneratingQuestions(true);
     setQuestionsError("");
     try {
-      await apiFetch(`/api/applications/${id}/generate/interview-questions`, { method: "POST" });
-      await loadData();
+      const created: InterviewQuestionsContent = await apiFetch(
+        `/api/applications/${id}/generate/interview-questions`,
+        { method: "POST" }
+      );
+      setInterviewQuestionSets((prev) => [created, ...prev]);
     } catch (err) {
       setQuestionsError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

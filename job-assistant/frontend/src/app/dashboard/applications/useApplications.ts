@@ -43,10 +43,6 @@ export function useApplications() {
     }
   }
 
-  async function loadApplications() {
-    setApplications(await apiFetch("/api/applications"));
-  }
-
   useEffect(() => {
     loadAll();
   }, []);
@@ -56,7 +52,7 @@ export function useApplications() {
     setLoading(true);
     setFormError("");
     try {
-      await apiFetch("/api/applications", {
+      const created = await apiFetch("/api/applications", {
         method: "POST",
         body: JSON.stringify({
           companyName,
@@ -66,12 +62,13 @@ export function useApplications() {
           jobUrl: jobUrl || undefined,
         }),
       });
+      const attachedResume = resumeId ? resumes.find((r) => r.id === resumeId) ?? null : null;
+      setApplications((prev) => [{ ...created, resume: attachedResume }, ...prev]);
       setCompanyName("");
       setJobTitle("");
       setJobDescription("");
       setJobUrl("");
       setResumeId("");
-      await loadApplications();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to add application.");
     } finally {
@@ -105,10 +102,12 @@ export function useApplications() {
 
   async function handleDelete(id: string) {
     setActionError("");
+    const previous = applications;
+    setApplications((prev) => prev.filter((a) => a.id !== id));
     try {
       await apiFetch(`/api/applications/${id}`, { method: "DELETE" });
-      await loadApplications();
     } catch (err) {
+      setApplications(previous);
       setActionError(err instanceof Error ? err.message : "Failed to delete application.");
     }
   }
@@ -116,13 +115,15 @@ export function useApplications() {
   async function handleStatusChange(id: string, status: string) {
     setSavingStatusId(id);
     setActionError("");
+    const previous = applications;
+    setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     try {
       await apiFetch(`/api/applications/${id}`, {
         method: "PUT",
         body: JSON.stringify({ status }),
       });
-      await loadApplications();
     } catch (err) {
+      setApplications(previous);
       setActionError(err instanceof Error ? err.message : "Failed to update status.");
     } finally {
       setSavingStatusId(null);
