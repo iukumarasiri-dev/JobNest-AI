@@ -5,6 +5,7 @@ import { prisma } from "./lib/db.js";
 import { authRouter } from "./routes/auth.js";
 import { applicationsRouter } from "./routes/applications.js";
 import { resumesRouter } from "./routes/resumes.js";
+import { companyRouter } from "./routes/company.js";
 
 export const app = express();
 
@@ -25,3 +26,4 @@ app.get("/health", async (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/applications", applicationsRouter);
 app.use("/api/resumes", resumesRouter);
+app.use("/api/company", companyRouter);
