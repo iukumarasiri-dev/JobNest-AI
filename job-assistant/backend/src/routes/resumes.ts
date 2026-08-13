@@ -6,9 +6,10 @@ import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 import { prisma } from "../lib/db.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { requireJobSeeker } from "../middleware/requireJobSeeker.js";
 
 export const resumesRouter = Router();
-resumesRouter.use(requireAuth);
+resumesRouter.use(requireAuth, requireJobSeeker);
 
 const resumeSchema = z.object({
   title: z.string().min(1),

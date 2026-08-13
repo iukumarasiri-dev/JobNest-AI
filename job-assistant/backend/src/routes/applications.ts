@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { requireJobSeeker } from "../middleware/requireJobSeeker.js";
 import {
   listApplications,
   createApplication,
@@ -17,7 +18,7 @@ import {
 } from "./applications/generate.js";
 
 export const applicationsRouter = Router();
-applicationsRouter.use(requireAuth);
+applicationsRouter.use(requireAuth, requireJobSeeker);
 
 applicationsRouter.get("/", listApplications);
 applicationsRouter.post("/", createApplication);
