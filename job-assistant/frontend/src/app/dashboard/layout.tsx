@@ -20,18 +20,49 @@ const EMPLOYER_NAV_ITEMS = [
   { href: "/dashboard/profile", label: "Profile", icon: UserCircle },
 ];
 
+const EMPLOYER_ONLY_PREFIXES = ["/dashboard/company"];
+const JOB_SEEKER_ONLY_PATHS = ["/dashboard", "/dashboard/applications", "/dashboard/resumes"];
+
+function isEmployerOnlyPath(pathname: string) {
+  return EMPLOYER_ONLY_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+function isJobSeekerOnlyPath(pathname: string) {
+  return JOB_SEEKER_ONLY_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const [role, setRole] = useState<"JOB_SEEKER" | "EMPLOYER" | null>(null);
+  const [roleChecked, setRoleChecked] = useState(false);
+  const [authFailed, setAuthFailed] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/auth/me")
-      .then((me) => setRole(me.role ?? "JOB_SEEKER"))
-      .catch(() => {});
+      .then((me) => setRole(me.role === "EMPLOYER" ? "EMPLOYER" : "JOB_SEEKER"))
+      .catch(() => setAuthFailed(true))
+      .finally(() => setRoleChecked(true));
   }, []);
+
+  useEffect(() => {
+    if (!roleChecked || !authFailed) return;
+    router.replace("/login");
+  }, [roleChecked, authFailed, router]);
+
+  const roleMismatch =
+    !!role &&
+    ((role === "EMPLOYER" && isJobSeekerOnlyPath(pathname)) ||
+      (role === "JOB_SEEKER" && isEmployerOnlyPath(pathname)));
+
+  useEffect(() => {
+    if (!roleChecked || !roleMismatch || !role) return;
+    router.replace(role === "EMPLOYER" ? "/dashboard/company" : "/dashboard");
+  }, [roleChecked, roleMismatch, role, router]);
 
   const NAV_ITEMS = role === "EMPLOYER" ? EMPLOYER_NAV_ITEMS : JOB_SEEKER_NAV_ITEMS;
 
@@ -65,7 +96,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             />
 
             <nav className="hidden md:flex items-center gap-1">
-              {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+              {roleChecked && !authFailed && NAV_ITEMS.map(({ href, label, icon: Icon }) => {
                 const active = isActive(href);
                 return (
                   <Link
@@ -132,7 +163,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {logoutError && <p className="text-sm text-destructive px-4 pt-4">{logoutError}</p>}
 
-      <main className="p-4 sm:p-6">{children}</main>
+      <main className="p-4 sm:p-6">
+        {!roleChecked || authFailed || roleMismatch ? null : children}
+      </main>
     </div>
   );
 }
