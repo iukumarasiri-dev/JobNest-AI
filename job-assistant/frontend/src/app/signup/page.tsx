@@ -6,24 +6,29 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import styles from "./signup.module.css";
 
+type Role = "JOB_SEEKER" | "EMPLOYER";
+
 type SignupFormData = {
   firstName: string;
   lastName: string;
   email: string;
   password: string;
   confirmPassword: string;
+  companyName: string;
 };
 
 type SignupErrors = Partial<Record<keyof SignupFormData | "general", string>>;
 
 export default function SignupPage() {
   const router = useRouter();
+  const [role, setRole] = useState<Role>("JOB_SEEKER");
   const [formData, setFormData] = useState<SignupFormData>({
     firstName: "",
     lastName: "",
     email: "",
     password: "",
     confirmPassword: "",
+    companyName: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<SignupErrors>({});
@@ -61,6 +66,10 @@ export default function SignupPage() {
       next.confirmPassword = "Passwords don't match";
     }
 
+    if (role === "EMPLOYER" && !formData.companyName.trim()) {
+      next.companyName = "Required";
+    }
+
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -79,9 +88,11 @@ export default function SignupPage() {
           name: `${formData.firstName} ${formData.lastName}`.trim(),
           email: formData.email,
           password: formData.password,
+          role,
+          ...(role === "EMPLOYER" ? { companyName: formData.companyName.trim() } : {}),
         }),
       });
-      router.push("/dashboard");
+      router.push(role === "EMPLOYER" ? "/dashboard/company" : "/dashboard");
       router.refresh();
     } catch (err) {
       setErrors((prev) => ({
@@ -110,6 +121,44 @@ export default function SignupPage() {
             </p>
 
             <form onSubmit={handleSubmit} className={styles.signupForm}>
+              <div className={styles.roleToggle} role="radiogroup" aria-label="Account type">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={role === "JOB_SEEKER"}
+                  onClick={() => setRole("JOB_SEEKER")}
+                  className={`${styles.roleOption}${role === "JOB_SEEKER" ? ` ${styles.roleOptionActive}` : ""}`}
+                >
+                  I&apos;m a job seeker
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={role === "EMPLOYER"}
+                  onClick={() => setRole("EMPLOYER")}
+                  className={`${styles.roleOption}${role === "EMPLOYER" ? ` ${styles.roleOptionActive}` : ""}`}
+                >
+                  I&apos;m hiring
+                </button>
+              </div>
+
+              {role === "EMPLOYER" && (
+                <div className={styles.formGroup}>
+                  <label htmlFor="companyName" className={styles.formLabel}>
+                    Company name
+                  </label>
+                  <input
+                    id="companyName"
+                    name="companyName"
+                    type="text"
+                    value={formData.companyName}
+                    onChange={handleChange}
+                    className={inputClasses("companyName")}
+                  />
+                  {errors.companyName && <p className={styles.errorText}>{errors.companyName}</p>}
+                </div>
+              )}
+
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label htmlFor="firstName" className={styles.formLabel}>
