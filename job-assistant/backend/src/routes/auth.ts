@@ -19,11 +19,18 @@ function hashToken(token: string) {
 
 export const authRouter = Router();
 
-const SignupSchema = z.object({
-  email: z.email(),
-  password: z.string().min(8),
-  name: z.string().min(1).optional(),
-});
+const SignupSchema = z
+  .object({
+    email: z.email(),
+    password: z.string().min(8),
+    name: z.string().min(1).optional(),
+    role: z.enum(["JOB_SEEKER", "EMPLOYER"]).default("JOB_SEEKER"),
+    companyName: z.string().min(1).optional(),
+  })
+  .refine((data) => data.role !== "EMPLOYER" || !!data.companyName?.trim(), {
+    message: "Company name is required for employer accounts",
+    path: ["companyName"],
+  });
 
 authRouter.post("/signup", async (req, res) => {
   const parsed = SignupSchema.safeParse(req.body);
@@ -31,19 +38,27 @@ authRouter.post("/signup", async (req, res) => {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const { email, password, name } = parsed.data;
+  const { email, password, name, role, companyName } = parsed.data;
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return res.status(409).json({ error: "Email already registered" });
   }
 
   const passwordHash = await hashPassword(password);
-  const user = await prisma.user.create({
-    data: { email, passwordHash, name, lastLoginAt: new Date() },
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: { email, passwordHash, name, role, lastLoginAt: new Date() },
+    });
+    if (role === "EMPLOYER") {
+      await tx.company.create({
+        data: { ownerId: created.id, name: companyName!.trim() },
+      });
+    }
+    return created;
   });
   await createSession(res, user.id);
 
-  res.status(201).json({ id: user.id, email: user.email, name: user.name });
+  res.status(201).json({ id: user.id, email: user.email, name: user.name, role: user.role });
 });
 
 const LoginSchema = z.object({
@@ -66,7 +81,7 @@ authRouter.post("/login", async (req, res) => {
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession(res, user.id);
   sendLoginNotificationEmail(user.email, user.name);
-  res.json({ id: user.id, email: user.email, name: user.name });
+  res.json({ id: user.id, email: user.email, name: user.name, role: user.role });
 });
 
 authRouter.post("/logout", async (req, res) => {
@@ -77,7 +92,7 @@ authRouter.post("/logout", async (req, res) => {
 authRouter.get("/me", async (req, res) => {
   const user = await getUserFromRequest(req);
   if (!user) return res.status(401).json({ error: "Not authenticated" });
-  res.json({ id: user.id, email: user.email, name: user.name });
+  res.json({ id: user.id, email: user.email, name: user.name, role: user.role });
 });
 
 const UpdateProfileSchema = z.object({

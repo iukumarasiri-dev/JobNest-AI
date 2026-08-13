@@ -1,17 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { LayoutDashboard, Briefcase, FileText, UserCircle, Menu, X } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, UserCircle, Building2, Menu, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-const NAV_ITEMS = [
+const JOB_SEEKER_NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/applications", label: "Applications", icon: Briefcase },
   { href: "/dashboard/resumes", label: "Resumes", icon: FileText },
+  { href: "/dashboard/profile", label: "Profile", icon: UserCircle },
+];
+
+const EMPLOYER_NAV_ITEMS = [
+  { href: "/dashboard/company", label: "Company Profile", icon: Building2 },
   { href: "/dashboard/profile", label: "Profile", icon: UserCircle },
 ];
 
@@ -20,6 +25,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [role, setRole] = useState<"JOB_SEEKER" | "EMPLOYER" | null>(null);
+
+  useEffect(() => {
+    apiFetch("/api/auth/me")
+      .then((me) => setRole(me.role ?? "JOB_SEEKER"))
+      .catch(() => {});
+  }, []);
+
+  const NAV_ITEMS = role === "EMPLOYER" ? EMPLOYER_NAV_ITEMS : JOB_SEEKER_NAV_ITEMS;
 
   async function handleLogout() {
     setLogoutError("");
