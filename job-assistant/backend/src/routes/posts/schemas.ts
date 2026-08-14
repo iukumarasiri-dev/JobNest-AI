@@ -13,10 +13,27 @@ const videoUrlSchema = z
   .optional()
   .or(z.literal(""));
 
+const ATTACHMENT_DATA_URL =
+  /^data:(image\/(png|jpe?g|gif|webp)|application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document);base64,/;
+const MAX_ATTACHMENT_DATA_URL_LENGTH = 14_000_000; // ~10MB raw file, base64-inflated, with margin
+
+const attachmentUrlSchema = z
+  .string()
+  .max(MAX_ATTACHMENT_DATA_URL_LENGTH)
+  .refine((val) => ATTACHMENT_DATA_URL.test(val), {
+    message: "Must be an uploaded image, PDF, or Word document",
+  })
+  .optional()
+  .or(z.literal(""));
+
+const attachmentNameSchema = z.string().max(200).optional().or(z.literal(""));
+
 const textPostSchema = z.object({
   kind: z.literal("TEXT"),
   body: z.string().min(1),
   videoUrl: videoUrlSchema,
+  attachmentUrl: attachmentUrlSchema,
+  attachmentName: attachmentNameSchema,
 });
 
 const jobPostSchema = z.object({
@@ -26,6 +43,8 @@ const jobPostSchema = z.object({
   location: z.string().optional(),
   salaryRange: z.string().optional(),
   videoUrl: videoUrlSchema,
+  attachmentUrl: attachmentUrlSchema,
+  attachmentName: attachmentNameSchema,
 });
 
 export const createPostSchema = z.discriminatedUnion("kind", [textPostSchema, jobPostSchema]);

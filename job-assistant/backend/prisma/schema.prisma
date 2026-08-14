@@ -114,18 +114,20 @@ model Company {
 }
 
 model Post {
-  id          String   @id @default(uuid())
-  authorId    String
-  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  kind        String   // "TEXT" | "JOB"
-  body        String?  // TEXT posts only
-  title       String?  // JOB posts only
-  description String?  // JOB posts only
-  location    String?  // JOB posts only
-  salaryRange String?  // JOB posts only
-  videoUrl    String?  // either kind, optional
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid())
+  authorId       String
+  author         User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  kind           String   // "TEXT" | "JOB"
+  body           String?  // TEXT posts only
+  title          String?  // JOB posts only
+  description    String?  // JOB posts only
+  location       String?  // JOB posts only
+  salaryRange    String?  // JOB posts only
+  videoUrl       String?  // either kind, optional
+  attachmentUrl  String?  // either kind, optional — image/PDF/DOCX, base64 data URI
+  attachmentName String?  // original filename, shown for PDF/DOCX download
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   likes        PostLike[]
   comments     PostComment[]
