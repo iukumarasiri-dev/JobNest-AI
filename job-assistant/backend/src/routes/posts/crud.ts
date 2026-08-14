@@ -63,6 +63,19 @@ async function fetchAndShapePosts(where: Record<string, unknown>, viewerId: stri
     : [];
   const followedAuthorIds = new Set(follows.map((f) => f.followingId));
 
+  // Applicant counts are only meaningful (and private) to the post's own author.
+  const myJobPostIds = posts
+    .filter((p) => p.kind === "JOB" && p.author.id === viewerId)
+    .map((p) => p.id);
+  const applicantCounts = myJobPostIds.length
+    ? await prisma.application.groupBy({
+        by: ["postId"],
+        where: { postId: { in: myJobPostIds } },
+        _count: { _all: true },
+      })
+    : [];
+  const applicantCountMap = new Map(applicantCounts.map((a) => [a.postId, a._count._all]));
+
   return posts.map((p) => ({
     id: p.id,
     kind: p.kind,
@@ -80,6 +93,8 @@ async function fetchAndShapePosts(where: Record<string, unknown>, viewerId: stri
     likedByMe: p.likes.length > 0,
     savedByMe: p.savedBy.length > 0,
     appliedByMe: p.kind === "JOB" ? appliedPostIds.has(p.id) : undefined,
+    applicantCount:
+      p.kind === "JOB" && p.author.id === viewerId ? applicantCountMap.get(p.id) ?? 0 : undefined,
   }));
 }
 

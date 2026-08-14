@@ -1,9 +1,22 @@
 import { z } from "zod";
 
+const HTTP_URL = /^https?:\/\//;
+const VIDEO_DATA_URL = /^data:video\/(mp4|webm|ogg|quicktime);base64,/;
+const MAX_VIDEO_DATA_URL_LENGTH = 17_000_000; // ~12MB raw file, base64-inflated, with margin
+
+const videoUrlSchema = z
+  .string()
+  .max(MAX_VIDEO_DATA_URL_LENGTH)
+  .refine((val) => HTTP_URL.test(val) || VIDEO_DATA_URL.test(val), {
+    message: "Must be a video link or an uploaded video file",
+  })
+  .optional()
+  .or(z.literal(""));
+
 const textPostSchema = z.object({
   kind: z.literal("TEXT"),
   body: z.string().min(1),
-  videoUrl: z.url().optional().or(z.literal("")),
+  videoUrl: videoUrlSchema,
 });
 
 const jobPostSchema = z.object({
@@ -12,7 +25,7 @@ const jobPostSchema = z.object({
   description: z.string().min(1),
   location: z.string().optional(),
   salaryRange: z.string().optional(),
-  videoUrl: z.url().optional().or(z.literal("")),
+  videoUrl: videoUrlSchema,
 });
 
 export const createPostSchema = z.discriminatedUnion("kind", [textPostSchema, jobPostSchema]);
