@@ -30,15 +30,15 @@ const JOB_SEEKER_NAV_ITEMS: NavItem[] = [
 ];
 
 const EMPLOYER_NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/company", label: "Company Profile", icon: Building2 },
   { href: "/dashboard/feed", label: "Feed", icon: Rss },
 ];
 
 const EMPLOYER_ONLY_PREFIXES = ["/dashboard/company"];
-// "/dashboard" is deliberately matched exactly (not as a prefix) — every other
-// dashboard route lives under "/dashboard/...", so a prefix match here would
-// wrongly claim every shared/employer route (feed, profile, company) too.
-const JOB_SEEKER_ONLY_EXACT = ["/dashboard"];
+// "/dashboard" itself is shared — dashboard/page.tsx renders a different view
+// per role, so it's deliberately left out of both role-only lists below.
+const JOB_SEEKER_ONLY_EXACT: string[] = [];
 const JOB_SEEKER_ONLY_PREFIXES = ["/dashboard/applications", "/dashboard/resumes"];
 
 function isEmployerOnlyPath(pathname: string) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ThumbsUp, MessageCircle, Bookmark, Globe } from "lucide-react";
 import type { Applicant, Post, PostComment, Resume } from "../types";
 import { POST_KIND_BADGE } from "@/lib/postKind";
 import { Avatar } from "@/components/avatar";
@@ -103,7 +104,8 @@ export function PostCard({
               )}
             </p>
             <p className="text-xs text-muted-foreground">
-              @{post.author.username} · {formatDate(post.createdAt)}
+              @{post.author.username} · {formatDate(post.createdAt)} ·{" "}
+              <Globe className="inline size-3" />
             </p>
           </div>
           {!isAuthor && (
@@ -150,7 +152,10 @@ export function PostCard({
 
       {post.videoUrl && (
         <div className="mt-3">
-          {embedUrl ? (
+          {post.videoUrl.startsWith("data:video/") ? (
+            // eslint-disable-next-line jsx-a11y/media-has-caption
+            <video controls className="w-full max-h-[480px] rounded bg-black" src={post.videoUrl} />
+          ) : embedUrl ? (
             <div className="aspect-video">
               <iframe
                 src={embedUrl}
@@ -167,22 +172,32 @@ export function PostCard({
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-4 text-sm">
+      <div className="mt-3 pt-2 border-t border-border flex items-center gap-1 text-sm">
         <button
           onClick={onToggleLike}
           disabled={liking}
-          className={post.likedByMe ? "text-primary font-medium" : "text-muted-foreground"}
+          className={`flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-muted transition-colors ${
+            post.likedByMe ? "text-primary font-medium" : "text-muted-foreground"
+          }`}
         >
-          {post.likedByMe ? "Liked" : "Like"} · {post.likeCount}
+          <ThumbsUp className="size-4" fill={post.likedByMe ? "currentColor" : "none"} />
+          Like · {post.likeCount}
         </button>
-        <button onClick={toggleComments} className="text-muted-foreground">
+        <button
+          onClick={toggleComments}
+          className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-muted transition-colors text-muted-foreground"
+        >
+          <MessageCircle className="size-4" />
           Comments · {post.commentCount}
         </button>
         <button
           onClick={onToggleSave}
           disabled={saving}
-          className={post.savedByMe ? "text-primary font-medium" : "text-muted-foreground"}
+          className={`flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-muted transition-colors ${
+            post.savedByMe ? "text-primary font-medium" : "text-muted-foreground"
+          }`}
         >
+          <Bookmark className="size-4" fill={post.savedByMe ? "currentColor" : "none"} />
           {post.savedByMe ? "Saved" : "Save"}
         </button>
 

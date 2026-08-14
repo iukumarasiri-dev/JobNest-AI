@@ -1,5 +1,6 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import { ProfileCard } from "@/components/profile-card";
 import { useFeed } from "./useFeed";
 import { PostComposer } from "./_components/PostComposer";
@@ -13,6 +14,7 @@ export default function FeedPage() {
     pageLoading,
     loadError,
     actionError,
+    refreshing,
     kind,
     setKind,
     body,
@@ -38,6 +40,7 @@ export default function FeedPage() {
     applicants,
     applicantsLoadingIds,
     loadAll,
+    refreshFeed,
     handleCreatePost,
     handleDeletePost,
     handleToggleLike,
@@ -51,9 +54,8 @@ export default function FeedPage() {
 
   if (pageLoading) {
     return (
-      <div>
-        <h1 className="text-2xl font-bold mb-6">Feed</h1>
-        <div className="border border-border rounded-lg p-4 animate-pulse space-y-3 max-w-lg">
+      <div className="max-w-7xl mx-auto">
+        <div className="border border-border rounded-xl p-4 animate-pulse space-y-3">
           <div className="h-3 w-20 bg-muted rounded" />
           <div className="h-9 bg-muted rounded" />
         </div>
@@ -63,8 +65,7 @@ export default function FeedPage() {
 
   if (loadError) {
     return (
-      <div>
-        <h1 className="text-2xl font-bold mb-6">Feed</h1>
+      <div className="max-w-7xl mx-auto">
         <div className="border border-destructive/30 bg-destructive/10 text-destructive rounded p-4 text-sm">
           <p className="mb-2">{loadError}</p>
           <button onClick={loadAll} className="underline">
@@ -78,62 +79,71 @@ export default function FeedPage() {
   if (!me) return null;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Feed</h1>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+      <div className="lg:col-span-2">
+        <PostComposer
+          meName={me.name}
+          meAvatarUrl={me.avatarUrl}
+          isEmployer={me.role === "EMPLOYER"}
+          kind={kind}
+          onKindChange={setKind}
+          body={body}
+          onBodyChange={setBody}
+          title={title}
+          onTitleChange={setTitle}
+          description={description}
+          onDescriptionChange={setDescription}
+          location={location}
+          onLocationChange={setLocation}
+          salaryRange={salaryRange}
+          onSalaryRangeChange={setSalaryRange}
+          videoUrl={videoUrl}
+          onVideoUrlChange={setVideoUrl}
+          submitting={submitting}
+          formError={formError}
+          onSubmit={handleCreatePost}
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <PostComposer
-            isEmployer={me.role === "EMPLOYER"}
-            kind={kind}
-            onKindChange={setKind}
-            body={body}
-            onBodyChange={setBody}
-            title={title}
-            onTitleChange={setTitle}
-            description={description}
-            onDescriptionChange={setDescription}
-            location={location}
-            onLocationChange={setLocation}
-            salaryRange={salaryRange}
-            onSalaryRangeChange={setSalaryRange}
-            videoUrl={videoUrl}
-            onVideoUrlChange={setVideoUrl}
-            submitting={submitting}
-            formError={formError}
-            onSubmit={handleCreatePost}
-          />
+        {actionError && <p className="text-sm text-destructive mb-3">{actionError}</p>}
 
-          {actionError && <p className="text-sm text-destructive mb-3">{actionError}</p>}
-
-          <PostList
-            posts={posts}
-            viewerId={me.id}
-            viewerRole={me.role}
-            resumes={resumes}
-            comments={comments}
-            commentsLoadingIds={commentsLoadingIds}
-            applicants={applicants}
-            applicantsLoadingIds={applicantsLoadingIds}
-            likingPostId={likingPostId}
-            savingPostId={savingPostId}
-            applyingPostId={applyingPostId}
-            followingAuthorId={followingAuthorId}
-            onToggleLike={handleToggleLike}
-            onToggleSave={handleToggleSave}
-            onLoadComments={loadComments}
-            onAddComment={handleAddComment}
-            onLoadApplicants={loadApplicants}
-            onApply={handleApply}
-            onDelete={handleDeletePost}
-            onToggleFollow={handleToggleFollow}
-          />
+        <div className="flex justify-end mb-3">
+          <button
+            type="button"
+            onClick={refreshFeed}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground border border-border rounded-full px-3 py-1.5 hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing..." : "Refresh feed"}
+          </button>
         </div>
 
-        <div className="lg:col-span-1">
-          <h2 className="text-lg font-semibold mb-3">Profile</h2>
-          <ProfileCard />
-        </div>
+        <PostList
+          posts={posts}
+          viewerId={me.id}
+          viewerRole={me.role}
+          resumes={resumes}
+          comments={comments}
+          commentsLoadingIds={commentsLoadingIds}
+          applicants={applicants}
+          applicantsLoadingIds={applicantsLoadingIds}
+          likingPostId={likingPostId}
+          savingPostId={savingPostId}
+          applyingPostId={applyingPostId}
+          followingAuthorId={followingAuthorId}
+          onToggleLike={handleToggleLike}
+          onToggleSave={handleToggleSave}
+          onLoadComments={loadComments}
+          onAddComment={handleAddComment}
+          onLoadApplicants={loadApplicants}
+          onApply={handleApply}
+          onDelete={handleDeletePost}
+          onToggleFollow={handleToggleFollow}
+        />
+      </div>
+
+      <div className="lg:col-span-1">
+        <ProfileCard />
       </div>
     </div>
   );

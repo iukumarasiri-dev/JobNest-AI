@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Applicant, Post, PostComment, Resume } from "./types";
 
-type Me = { id: string; role: "JOB_SEEKER" | "EMPLOYER" };
+type Me = { id: string; role: "JOB_SEEKER" | "EMPLOYER"; name: string | null; avatarUrl: string | null };
 
 export function useFeed() {
   const [me, setMe] = useState<Me | null>(null);
@@ -11,6 +11,7 @@ export function useFeed() {
   const [pageLoading, setPageLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   const [kind, setKind] = useState<"TEXT" | "JOB">("TEXT");
   const [body, setBody] = useState("");
@@ -55,6 +56,20 @@ export function useFeed() {
   useEffect(() => {
     loadAll();
   }, []);
+
+  // Lightweight refresh — pulls in posts from other users without the
+  // full-page skeleton loadAll() shows on first mount.
+  async function refreshFeed() {
+    setRefreshing(true);
+    setActionError("");
+    try {
+      setPosts(await apiFetch("/api/posts"));
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to refresh the feed.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function handleCreatePost(e: React.FormEvent) {
     e.preventDefault();
@@ -236,6 +251,7 @@ export function useFeed() {
     pageLoading,
     loadError,
     actionError,
+    refreshing,
     kind,
     setKind,
     body,
@@ -261,6 +277,7 @@ export function useFeed() {
     applicants,
     applicantsLoadingIds,
     loadAll,
+    refreshFeed,
     handleCreatePost,
     handleDeletePost,
     handleToggleLike,

@@ -25,6 +25,7 @@ export type Post = {
   likedByMe: boolean;
   savedByMe: boolean;
   appliedByMe?: boolean;
+  applicantCount?: number;
 };
 
 export type PostComment = {
