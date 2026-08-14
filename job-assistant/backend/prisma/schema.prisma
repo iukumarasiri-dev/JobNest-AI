@@ -17,6 +17,12 @@ model User {
   email        String    @unique
   passwordHash String
   name         String?
+  username     String    @unique
+  avatarUrl    String?
+  bannerUrl    String?
+  jobRole      String?
+  location     String?
+  birthDate    DateTime?
   role         UserRole  @default(JOB_SEEKER)
   createdAt    DateTime  @default(now())
   lastLoginAt  DateTime?
@@ -31,6 +37,20 @@ model User {
   posts        Post[]
   postLikes    PostLike[]
   postComments PostComment[]
+  savedPosts   SavedPost[]
+  following    Follow[]      @relation("Following")
+  followers    Follow[]      @relation("Followers")
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
 }
 
 model Session {
@@ -110,6 +130,18 @@ model Post {
   likes        PostLike[]
   comments     PostComment[]
   applications Application[]
+  savedBy      SavedPost[]
+}
+
+model SavedPost {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
 }
 
 model PostLike {
