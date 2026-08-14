@@ -85,6 +85,8 @@ async function fetchAndShapePosts(where: Record<string, unknown>, viewerId: stri
     location: p.location,
     salaryRange: p.salaryRange,
     videoUrl: p.videoUrl,
+    attachmentUrl: p.attachmentUrl,
+    attachmentName: p.attachmentName,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
     author: formatAuthor(p.author, followedAuthorIds.has(p.author.id)),
@@ -140,11 +142,15 @@ export async function createPost(req: Request, res: Response) {
           location: parsed.data.location,
           salaryRange: parsed.data.salaryRange,
           videoUrl: parsed.data.videoUrl || undefined,
+          attachmentUrl: parsed.data.attachmentUrl || undefined,
+          attachmentName: parsed.data.attachmentName || undefined,
         }
       : {
           kind: "TEXT" as const,
           body: parsed.data.body,
           videoUrl: parsed.data.videoUrl || undefined,
+          attachmentUrl: parsed.data.attachmentUrl || undefined,
+          attachmentName: parsed.data.attachmentName || undefined,
         };
 
   const post = await prisma.post.create({ data: { ...data, authorId: req.user!.id } });

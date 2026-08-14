@@ -17,6 +17,8 @@ export type Post = {
   location: string | null;
   salaryRange: string | null;
   videoUrl: string | null;
+  attachmentUrl: string | null;
+  attachmentName: string | null;
   createdAt: string;
   updatedAt: string;
   author: PostAuthor;

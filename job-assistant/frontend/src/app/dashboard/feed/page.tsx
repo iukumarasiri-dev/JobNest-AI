@@ -29,6 +29,10 @@ export default function FeedPage() {
     setSalaryRange,
     videoUrl,
     setVideoUrl,
+    attachmentUrl,
+    setAttachmentUrl,
+    attachmentName,
+    setAttachmentName,
     submitting,
     formError,
     likingPostId,
@@ -99,6 +103,10 @@ export default function FeedPage() {
           onSalaryRangeChange={setSalaryRange}
           videoUrl={videoUrl}
           onVideoUrlChange={setVideoUrl}
+          attachmentUrl={attachmentUrl}
+          onAttachmentUrlChange={setAttachmentUrl}
+          attachmentName={attachmentName}
+          onAttachmentNameChange={setAttachmentName}
           submitting={submitting}
           formError={formError}
           onSubmit={handleCreatePost}
