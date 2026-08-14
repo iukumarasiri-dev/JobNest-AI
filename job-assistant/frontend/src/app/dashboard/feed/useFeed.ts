@@ -20,6 +20,8 @@ export function useFeed() {
   const [location, setLocation] = useState("");
   const [salaryRange, setSalaryRange] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [attachmentName, setAttachmentName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -85,8 +87,16 @@ export function useFeed() {
               location: location || undefined,
               salaryRange: salaryRange || undefined,
               videoUrl: videoUrl || undefined,
+              attachmentUrl: attachmentUrl || undefined,
+              attachmentName: attachmentName || undefined,
             }
-          : { kind, body, videoUrl: videoUrl || undefined };
+          : {
+              kind,
+              body,
+              videoUrl: videoUrl || undefined,
+              attachmentUrl: attachmentUrl || undefined,
+              attachmentName: attachmentName || undefined,
+            };
 
       const created = await apiFetch("/api/posts", {
         method: "POST",
@@ -99,6 +109,8 @@ export function useFeed() {
       setLocation("");
       setSalaryRange("");
       setVideoUrl("");
+      setAttachmentUrl("");
+      setAttachmentName("");
       setKind("TEXT");
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to publish post.");
@@ -266,6 +278,10 @@ export function useFeed() {
     setSalaryRange,
     videoUrl,
     setVideoUrl,
+    attachmentUrl,
+    setAttachmentUrl,
+    attachmentName,
+    setAttachmentName,
     submitting,
     formError,
     likingPostId,
