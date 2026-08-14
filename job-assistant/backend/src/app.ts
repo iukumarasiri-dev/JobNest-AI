@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { prisma } from "./lib/db.js";
 import { authRouter } from "./routes/auth.js";
+import { googleAuthRouter } from "./routes/googleAuth.js";
 import { applicationsRouter } from "./routes/applications.js";
 import { resumesRouter } from "./routes/resumes.js";
 import { companyRouter } from "./routes/company.js";
@@ -24,6 +25,7 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/auth/google", googleAuthRouter);
 app.use("/api/applications", applicationsRouter);
 app.use("/api/resumes", resumesRouter);
 app.use("/api/company", companyRouter);
