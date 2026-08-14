@@ -5,57 +5,105 @@ import { createPostSchema } from "./schemas.js";
 const authorSelect = {
   id: true,
   name: true,
+  username: true,
+  avatarUrl: true,
   role: true,
   company: { select: { name: true } },
 } as const;
 
-function formatAuthor(author: { id: string; name: string | null; role: string; company: { name: string } | null }) {
+function formatAuthor(
+  author: {
+    id: string;
+    name: string | null;
+    username: string;
+    avatarUrl: string | null;
+    role: string;
+    company: { name: string } | null;
+  },
+  isFollowedByMe: boolean
+) {
   return {
     id: author.id,
     name: author.name,
+    username: author.username,
+    avatarUrl: author.avatarUrl,
     role: author.role,
     companyName: author.company?.name ?? null,
+    isFollowedByMe,
   };
 }
 
-export async function listPosts(req: Request, res: Response) {
+async function fetchAndShapePosts(where: Record<string, unknown>, viewerId: string) {
   const posts = await prisma.post.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       author: { select: authorSelect },
       _count: { select: { likes: true, comments: true } },
-      likes: { where: { userId: req.user!.id }, select: { id: true } },
+      likes: { where: { userId: viewerId }, select: { id: true } },
+      savedBy: { where: { userId: viewerId }, select: { id: true } },
     },
   });
 
   const jobPostIds = posts.filter((p) => p.kind === "JOB").map((p) => p.id);
   const applied = jobPostIds.length
     ? await prisma.application.findMany({
-        where: { userId: req.user!.id, postId: { in: jobPostIds } },
+        where: { userId: viewerId, postId: { in: jobPostIds } },
         select: { postId: true },
       })
     : [];
   const appliedPostIds = new Set(applied.map((a) => a.postId));
 
-  res.json(
-    posts.map((p) => ({
-      id: p.id,
-      kind: p.kind,
-      body: p.body,
-      title: p.title,
-      description: p.description,
-      location: p.location,
-      salaryRange: p.salaryRange,
-      videoUrl: p.videoUrl,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-      author: formatAuthor(p.author),
-      likeCount: p._count.likes,
-      commentCount: p._count.comments,
-      likedByMe: p.likes.length > 0,
-      appliedByMe: p.kind === "JOB" ? appliedPostIds.has(p.id) : undefined,
-    }))
-  );
+  const authorIds = [...new Set(posts.map((p) => p.author.id))];
+  const follows = authorIds.length
+    ? await prisma.follow.findMany({
+        where: { followerId: viewerId, followingId: { in: authorIds } },
+        select: { followingId: true },
+      })
+    : [];
+  const followedAuthorIds = new Set(follows.map((f) => f.followingId));
+
+  return posts.map((p) => ({
+    id: p.id,
+    kind: p.kind,
+    body: p.body,
+    title: p.title,
+    description: p.description,
+    location: p.location,
+    salaryRange: p.salaryRange,
+    videoUrl: p.videoUrl,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    author: formatAuthor(p.author, followedAuthorIds.has(p.author.id)),
+    likeCount: p._count.likes,
+    commentCount: p._count.comments,
+    likedByMe: p.likes.length > 0,
+    savedByMe: p.savedBy.length > 0,
+    appliedByMe: p.kind === "JOB" ? appliedPostIds.has(p.id) : undefined,
+  }));
+}
+
+export async function listPosts(req: Request, res: Response) {
+  res.json(await fetchAndShapePosts({}, req.user!.id));
+}
+
+export async function listMyPosts(req: Request, res: Response) {
+  res.json(await fetchAndShapePosts({ authorId: req.user!.id }, req.user!.id));
+}
+
+export async function listSavedPosts(req: Request, res: Response) {
+  const saved = await prisma.savedPost.findMany({
+    where: { userId: req.user!.id },
+    orderBy: { createdAt: "desc" },
+    select: { postId: true },
+  });
+  const postIds = saved.map((s) => s.postId);
+  if (postIds.length === 0) return res.json([]);
+
+  const shaped = await fetchAndShapePosts({ id: { in: postIds } }, req.user!.id);
+  const savedOrder = new Map(postIds.map((id, i) => [id, i]));
+  shaped.sort((a, b) => (savedOrder.get(a.id) ?? 0) - (savedOrder.get(b.id) ?? 0));
+  res.json(shaped);
 }
 
 export async function createPost(req: Request, res: Response) {
@@ -84,66 +132,15 @@ export async function createPost(req: Request, res: Response) {
           videoUrl: parsed.data.videoUrl || undefined,
         };
 
-  const post = await prisma.post.create({
-    data: { ...data, authorId: req.user!.id },
-    include: { author: { select: authorSelect } },
-  });
-
-  res.status(201).json({
-    id: post.id,
-    kind: post.kind,
-    body: post.body,
-    title: post.title,
-    description: post.description,
-    location: post.location,
-    salaryRange: post.salaryRange,
-    videoUrl: post.videoUrl,
-    createdAt: post.createdAt,
-    updatedAt: post.updatedAt,
-    author: formatAuthor(post.author),
-    likeCount: 0,
-    commentCount: 0,
-    likedByMe: false,
-    appliedByMe: post.kind === "JOB" ? false : undefined,
-  });
+  const post = await prisma.post.create({ data: { ...data, authorId: req.user!.id } });
+  const [shaped] = await fetchAndShapePosts({ id: post.id }, req.user!.id);
+  res.status(201).json(shaped);
 }
 
 export async function getPost(req: Request, res: Response) {
-  const post = await prisma.post.findUnique({
-    where: { id: req.params.id },
-    include: {
-      author: { select: authorSelect },
-      _count: { select: { likes: true, comments: true } },
-      likes: { where: { userId: req.user!.id }, select: { id: true } },
-    },
-  });
-  if (!post) return res.status(404).json({ error: "Not found" });
-
-  let appliedByMe: boolean | undefined;
-  if (post.kind === "JOB") {
-    const existing = await prisma.application.findFirst({
-      where: { userId: req.user!.id, postId: post.id },
-    });
-    appliedByMe = !!existing;
-  }
-
-  res.json({
-    id: post.id,
-    kind: post.kind,
-    body: post.body,
-    title: post.title,
-    description: post.description,
-    location: post.location,
-    salaryRange: post.salaryRange,
-    videoUrl: post.videoUrl,
-    createdAt: post.createdAt,
-    updatedAt: post.updatedAt,
-    author: formatAuthor(post.author),
-    likeCount: post._count.likes,
-    commentCount: post._count.comments,
-    likedByMe: post.likes.length > 0,
-    appliedByMe,
-  });
+  const [shaped] = await fetchAndShapePosts({ id: req.params.id }, req.user!.id);
+  if (!shaped) return res.status(404).json({ error: "Not found" });
+  res.json(shaped);
 }
 
 export async function deletePost(req: Request, res: Response) {

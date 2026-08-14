@@ -20,6 +20,23 @@ export async function toggleLike(req: Request, res: Response) {
   res.json({ liked: !existing, likeCount });
 }
 
+export async function toggleSave(req: Request, res: Response) {
+  const post = await prisma.post.findUnique({ where: { id: req.params.id } });
+  if (!post) return res.status(404).json({ error: "Not found" });
+
+  const existing = await prisma.savedPost.findFirst({
+    where: { postId: post.id, userId: req.user!.id },
+  });
+
+  if (existing) {
+    await prisma.savedPost.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.savedPost.create({ data: { postId: post.id, userId: req.user!.id } });
+  }
+
+  res.json({ saved: !existing });
+}
+
 export async function listComments(req: Request, res: Response) {
   const post = await prisma.post.findUnique({ where: { id: req.params.id } });
   if (!post) return res.status(404).json({ error: "Not found" });
