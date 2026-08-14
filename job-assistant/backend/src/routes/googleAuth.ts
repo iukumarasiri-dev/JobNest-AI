@@ -4,6 +4,7 @@ import { OAuth2Client } from "google-auth-library";
 import { prisma } from "../lib/db.js";
 import { hashPassword } from "../lib/password.js";
 import { createSession } from "../lib/session.js";
+import { generateUniqueUsername } from "../lib/username.js";
 
 const STATE_COOKIE = "google_oauth_state";
 const STATE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
@@ -71,11 +72,14 @@ googleAuthRouter.get("/callback", async (req, res) => {
     let user = await prisma.user.findUnique({ where: { email: payload.email } });
     if (!user) {
       const randomPassword = crypto.randomBytes(32).toString("hex");
+      const username = await generateUniqueUsername(payload.name || payload.email.split("@")[0]);
       user = await prisma.user.create({
         data: {
           email: payload.email,
           passwordHash: await hashPassword(randomPassword),
           name: payload.name ?? null,
+          username,
+          avatarUrl: payload.picture ?? null,
           role: "JOB_SEEKER",
           lastLoginAt: new Date(),
         },
