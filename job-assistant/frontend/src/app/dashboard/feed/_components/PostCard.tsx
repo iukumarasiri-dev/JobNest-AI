@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ThumbsUp, MessageCircle, Bookmark, Globe } from "lucide-react";
+import { ThumbsUp, MessageCircle, Bookmark, Globe, FileText, Download } from "lucide-react";
 import type { Applicant, Post, PostComment, Resume } from "../types";
 import { POST_KIND_BADGE } from "@/lib/postKind";
 import { Avatar } from "@/components/avatar";
@@ -167,6 +167,44 @@ export function PostCard({
           ) : (
             <a href={post.videoUrl} target="_blank" rel="noreferrer" className="text-sm underline">
               {post.videoUrl}
+            </a>
+          )}
+        </div>
+      )}
+
+      {post.attachmentUrl && (
+        <div className="mt-3">
+          {post.attachmentUrl.startsWith("data:image/") ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={post.attachmentUrl}
+              alt={post.attachmentName ?? ""}
+              className="w-full max-h-[480px] object-contain rounded border border-border bg-muted"
+            />
+          ) : post.attachmentUrl.startsWith("data:application/pdf") ? (
+            <div className="border border-border rounded overflow-hidden">
+              <iframe
+                src={post.attachmentUrl}
+                title={post.attachmentName ?? "PDF"}
+                className="w-full h-[480px]"
+              />
+              <a
+                href={post.attachmentUrl}
+                download={post.attachmentName || "document.pdf"}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground p-2 border-t border-border hover:bg-muted transition-colors"
+              >
+                <Download className="size-3.5" /> Download {post.attachmentName || "PDF"}
+              </a>
+            </div>
+          ) : (
+            <a
+              href={post.attachmentUrl}
+              download={post.attachmentName || "document"}
+              className="flex items-center gap-2 border border-border rounded p-3 text-sm hover:bg-muted transition-colors"
+            >
+              <FileText className="size-5 text-muted-foreground shrink-0" />
+              <span className="truncate">{post.attachmentName || "Download attachment"}</span>
+              <Download className="size-4 text-muted-foreground ml-auto shrink-0" />
             </a>
           )}
         </div>

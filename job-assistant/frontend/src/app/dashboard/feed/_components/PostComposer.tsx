@@ -1,10 +1,20 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Video, Briefcase, Upload } from "lucide-react";
+import { Video, Briefcase, Upload, Paperclip } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 
 const MAX_VIDEO_BYTES = 12 * 1024 * 1024; // 12MB — base64-encoded and stored directly in the database
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB — base64-encoded and stored directly in the database
+const ATTACHMENT_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -33,6 +43,10 @@ export function PostComposer({
   onSalaryRangeChange,
   videoUrl,
   onVideoUrlChange,
+  attachmentUrl,
+  onAttachmentUrlChange,
+  attachmentName,
+  onAttachmentNameChange,
   submitting,
   formError,
   onSubmit,
@@ -54,6 +68,10 @@ export function PostComposer({
   onSalaryRangeChange: (value: string) => void;
   videoUrl: string;
   onVideoUrlChange: (value: string) => void;
+  attachmentUrl: string;
+  onAttachmentUrlChange: (value: string) => void;
+  attachmentName: string;
+  onAttachmentNameChange: (value: string) => void;
   submitting: boolean;
   formError: string;
   onSubmit: (e: React.FormEvent) => void;
@@ -64,10 +82,16 @@ export function PostComposer({
   const [videoUploading, setVideoUploading] = useState(false);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
 
+  const [showAttachmentField, setShowAttachmentField] = useState(false);
+  const [attachmentError, setAttachmentError] = useState("");
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const attachmentFileInputRef = useRef<HTMLInputElement>(null);
+
   function handleSubmit(e: React.FormEvent) {
     onSubmit(e);
     setExpanded(false);
     setShowVideoField(false);
+    setShowAttachmentField(false);
   }
 
   async function handleVideoFileChange(file: File | undefined) {
@@ -88,6 +112,28 @@ export function PostComposer({
       setVideoFileError("Failed to read video file.");
     } finally {
       setVideoUploading(false);
+    }
+  }
+
+  async function handleAttachmentFileChange(file: File | undefined) {
+    if (!file) return;
+    setAttachmentError("");
+    if (!ATTACHMENT_TYPES.includes(file.type)) {
+      setAttachmentError("Please choose an image, PDF, or Word document.");
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setAttachmentError("File is too large (max 10MB).");
+      return;
+    }
+    setAttachmentUploading(true);
+    try {
+      onAttachmentUrlChange(await readFileAsDataUrl(file));
+      onAttachmentNameChange(file.name);
+    } catch {
+      setAttachmentError("Failed to read file.");
+    } finally {
+      setAttachmentUploading(false);
     }
   }
 
@@ -224,18 +270,72 @@ export function PostComposer({
             </div>
           )}
 
+          {showAttachmentField && (
+            <div className="space-y-2">
+              {attachmentUrl ? (
+                <div className="flex items-center justify-between gap-2 border border-border rounded p-2 bg-background text-sm">
+                  <span className="text-muted-foreground truncate">
+                    {attachmentName || "File attached"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAttachmentUrlChange("");
+                      onAttachmentNameChange("");
+                    }}
+                    className="text-xs text-destructive underline shrink-0"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={attachmentFileInputRef}
+                    type="file"
+                    accept="image/*,.pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => handleAttachmentFileChange(e.target.files?.[0])}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => attachmentFileInputRef.current?.click()}
+                    disabled={attachmentUploading}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground border border-border rounded px-2 py-1 hover:bg-muted transition-colors disabled:opacity-50"
+                  >
+                    <Upload className="size-3.5" />
+                    {attachmentUploading ? "Uploading..." : "Upload image, PDF, or Word doc (max 10MB)"}
+                  </button>
+                </div>
+              )}
+
+              {attachmentError && <p className="text-xs text-destructive">{attachmentError}</p>}
+            </div>
+          )}
+
           {formError && <p className="text-sm text-destructive">{formError}</p>}
 
           <div className="flex items-center justify-between pt-1 border-t border-border">
-            <button
-              type="button"
-              onClick={() => setShowVideoField((v) => !v)}
-              className={`flex items-center gap-1.5 text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
-                showVideoField ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              <Video className="size-4" /> Video
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setShowVideoField((v) => !v)}
+                className={`flex items-center gap-1.5 text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
+                  showVideoField ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Video className="size-4" /> Video
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAttachmentField((v) => !v)}
+                className={`flex items-center gap-1.5 text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
+                  showAttachmentField ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Paperclip className="size-4" /> File
+              </button>
+            </div>
 
             <div className="flex items-center gap-2">
               <button
@@ -243,6 +343,7 @@ export function PostComposer({
                 onClick={() => {
                   setExpanded(false);
                   setShowVideoField(false);
+                  setShowAttachmentField(false);
                 }}
                 className="text-sm text-muted-foreground px-3 py-1.5 rounded hover:bg-muted transition-colors"
               >
@@ -257,6 +358,12 @@ export function PostComposer({
               </button>
             </div>
           </div>
+
+          {submitting && (isUploadedVideo || !!attachmentUrl) && (
+            <p className="text-xs text-muted-foreground text-right">
+              Uploading your file — large files can take up to 30 seconds, please don&apos;t close this tab.
+            </p>
+          )}
         </form>
       )}
     </div>
