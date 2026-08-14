@@ -11,13 +11,17 @@ export function PostList({
   applicants,
   applicantsLoadingIds,
   likingPostId,
+  savingPostId,
   applyingPostId,
+  followingAuthorId,
   onToggleLike,
+  onToggleSave,
   onLoadComments,
   onAddComment,
   onLoadApplicants,
   onApply,
   onDelete,
+  onToggleFollow,
 }: {
   posts: Post[];
   viewerId: string;
@@ -28,13 +32,17 @@ export function PostList({
   applicants: Record<string, Applicant[]>;
   applicantsLoadingIds: Record<string, boolean>;
   likingPostId: string | null;
+  savingPostId: string | null;
   applyingPostId: string | null;
+  followingAuthorId: string | null;
   onToggleLike: (id: string) => void;
+  onToggleSave: (id: string) => void;
   onLoadComments: (id: string) => void;
   onAddComment: (id: string, body: string) => void;
   onLoadApplicants: (id: string) => void;
   onApply: (id: string, resumeId: string) => void;
   onDelete: (id: string) => void;
+  onToggleFollow: (authorId: string) => void;
 }) {
   if (posts.length === 0) {
     return (
@@ -58,13 +66,17 @@ export function PostList({
           applicants={applicants[post.id]}
           applicantsLoading={!!applicantsLoadingIds[post.id]}
           liking={likingPostId === post.id}
+          saving={savingPostId === post.id}
           applying={applyingPostId === post.id}
+          followingAuthor={followingAuthorId === post.author.id}
           onToggleLike={() => onToggleLike(post.id)}
+          onToggleSave={() => onToggleSave(post.id)}
           onLoadComments={() => onLoadComments(post.id)}
           onAddComment={(body) => onAddComment(post.id, body)}
           onLoadApplicants={() => onLoadApplicants(post.id)}
           onApply={(resumeId) => onApply(post.id, resumeId)}
           onDelete={() => onDelete(post.id)}
+          onToggleFollow={() => onToggleFollow(post.author.id)}
         />
       ))}
     </div>

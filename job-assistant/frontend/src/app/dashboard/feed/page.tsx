@@ -30,7 +30,9 @@ export default function FeedPage() {
     submitting,
     formError,
     likingPostId,
+    savingPostId,
     applyingPostId,
+    followingAuthorId,
     comments,
     commentsLoadingIds,
     applicants,
@@ -39,7 +41,9 @@ export default function FeedPage() {
     handleCreatePost,
     handleDeletePost,
     handleToggleLike,
+    handleToggleSave,
     handleApply,
+    handleToggleFollow,
     loadComments,
     handleAddComment,
     loadApplicants,
@@ -112,13 +116,17 @@ export default function FeedPage() {
             applicants={applicants}
             applicantsLoadingIds={applicantsLoadingIds}
             likingPostId={likingPostId}
+            savingPostId={savingPostId}
             applyingPostId={applyingPostId}
+            followingAuthorId={followingAuthorId}
             onToggleLike={handleToggleLike}
+            onToggleSave={handleToggleSave}
             onLoadComments={loadComments}
             onAddComment={handleAddComment}
             onLoadApplicants={loadApplicants}
             onApply={handleApply}
             onDelete={handleDeletePost}
+            onToggleFollow={handleToggleFollow}
           />
         </div>
 

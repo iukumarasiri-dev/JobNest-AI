@@ -23,7 +23,9 @@ export function useFeed() {
   const [formError, setFormError] = useState("");
 
   const [likingPostId, setLikingPostId] = useState<string | null>(null);
+  const [savingPostId, setSavingPostId] = useState<string | null>(null);
   const [applyingPostId, setApplyingPostId] = useState<string | null>(null);
+  const [followingAuthorId, setFollowingAuthorId] = useState<string | null>(null);
 
   const [comments, setComments] = useState<Record<string, PostComment[]>>({});
   const [commentsLoadingIds, setCommentsLoadingIds] = useState<Record<string, boolean>>({});
@@ -126,6 +128,22 @@ export function useFeed() {
     }
   }
 
+  async function handleToggleSave(id: string) {
+    setActionError("");
+    setSavingPostId(id);
+    const previous = posts;
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, savedByMe: !p.savedByMe } : p)));
+    try {
+      const data = await apiFetch(`/api/posts/${id}/save`, { method: "POST" });
+      setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, savedByMe: data.saved } : p)));
+    } catch (err) {
+      setPosts(previous);
+      setActionError(err instanceof Error ? err.message : "Failed to update saved post.");
+    } finally {
+      setSavingPostId(null);
+    }
+  }
+
   async function handleApply(id: string, resumeId: string) {
     setActionError("");
     setApplyingPostId(id);
@@ -141,6 +159,34 @@ export function useFeed() {
       setActionError(err instanceof Error ? err.message : "Failed to apply.");
     } finally {
       setApplyingPostId(null);
+    }
+  }
+
+  async function handleToggleFollow(authorId: string) {
+    setActionError("");
+    setFollowingAuthorId(authorId);
+    const previous = posts;
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.author.id === authorId
+          ? { ...p, author: { ...p.author, isFollowedByMe: !p.author.isFollowedByMe } }
+          : p
+      )
+    );
+    try {
+      const data = await apiFetch(`/api/users/${authorId}/follow`, { method: "POST" });
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.author.id === authorId
+            ? { ...p, author: { ...p.author, isFollowedByMe: data.following } }
+            : p
+        )
+      );
+    } catch (err) {
+      setPosts(previous);
+      setActionError(err instanceof Error ? err.message : "Failed to update follow.");
+    } finally {
+      setFollowingAuthorId(null);
     }
   }
 
@@ -207,7 +253,9 @@ export function useFeed() {
     submitting,
     formError,
     likingPostId,
+    savingPostId,
     applyingPostId,
+    followingAuthorId,
     comments,
     commentsLoadingIds,
     applicants,
@@ -216,7 +264,9 @@ export function useFeed() {
     handleCreatePost,
     handleDeletePost,
     handleToggleLike,
+    handleToggleSave,
     handleApply,
+    handleToggleFollow,
     loadComments,
     handleAddComment,
     loadApplicants,

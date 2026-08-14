@@ -15,6 +15,9 @@ type SignupFormData = {
   password: string;
   confirmPassword: string;
   companyName: string;
+  jobRole: string;
+  location: string;
+  birthDate: string;
 };
 
 type SignupErrors = Partial<Record<keyof SignupFormData | "general", string>>;
@@ -29,6 +32,9 @@ export default function SignupPage() {
     password: "",
     confirmPassword: "",
     companyName: "",
+    jobRole: "",
+    location: "",
+    birthDate: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<SignupErrors>({});
@@ -89,6 +95,9 @@ export default function SignupPage() {
           email: formData.email,
           password: formData.password,
           role,
+          jobRole: formData.jobRole.trim() || undefined,
+          location: formData.location.trim() || undefined,
+          birthDate: formData.birthDate || undefined,
           ...(role === "EMPLOYER" ? { companyName: formData.companyName.trim() } : {}),
         }),
       });
@@ -188,6 +197,51 @@ export default function SignupPage() {
                   />
                   {errors.lastName && <p className={styles.errorText}>{errors.lastName}</p>}
                 </div>
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="jobRole" className={styles.formLabel}>
+                    Job role (optional)
+                  </label>
+                  <input
+                    id="jobRole"
+                    name="jobRole"
+                    type="text"
+                    placeholder="e.g. Software Engineer"
+                    value={formData.jobRole}
+                    onChange={handleChange}
+                    className={inputClasses("jobRole")}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor="location" className={styles.formLabel}>
+                    Location (optional)
+                  </label>
+                  <input
+                    id="location"
+                    name="location"
+                    type="text"
+                    placeholder="e.g. Colombo, Sri Lanka"
+                    value={formData.location}
+                    onChange={handleChange}
+                    className={inputClasses("location")}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="birthDate" className={styles.formLabel}>
+                  Birth date (optional)
+                </label>
+                <input
+                  id="birthDate"
+                  name="birthDate"
+                  type="date"
+                  value={formData.birthDate}
+                  onChange={handleChange}
+                  className={inputClasses("birthDate")}
+                />
               </div>
 
               <div className={styles.formGroup}>

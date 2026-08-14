@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Applicant, Post, PostComment, Resume } from "../types";
 import { POST_KIND_BADGE } from "@/lib/postKind";
+import { Avatar } from "@/components/avatar";
 import { CommentSection } from "./CommentSection";
 import { ApplicantsPanel } from "./ApplicantsPanel";
 
@@ -39,13 +40,17 @@ export function PostCard({
   applicants,
   applicantsLoading,
   liking,
+  saving,
   applying,
+  followingAuthor,
   onToggleLike,
+  onToggleSave,
   onLoadComments,
   onAddComment,
   onLoadApplicants,
   onApply,
   onDelete,
+  onToggleFollow,
 }: {
   post: Post;
   viewerId: string;
@@ -56,13 +61,17 @@ export function PostCard({
   applicants: Applicant[] | undefined;
   applicantsLoading: boolean;
   liking: boolean;
+  saving: boolean;
   applying: boolean;
+  followingAuthor: boolean;
   onToggleLike: () => void;
+  onToggleSave: () => void;
   onLoadComments: () => void;
   onAddComment: (body: string) => void;
   onLoadApplicants: () => void;
   onApply: (resumeId: string) => void;
   onDelete: () => void;
+  onToggleFollow: () => void;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [applicantsOpen, setApplicantsOpen] = useState(false);
@@ -84,14 +93,32 @@ export function PostCard({
   return (
     <div className="border border-border rounded-lg p-4">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="font-medium text-sm">
-            {post.author.name ?? "Someone"}
-            {post.author.companyName && (
-              <span className="text-muted-foreground"> · {post.author.companyName}</span>
-            )}
-          </p>
-          <p className="text-xs text-muted-foreground">{formatDate(post.createdAt)}</p>
+        <div className="flex items-start gap-2.5">
+          <Avatar src={post.author.avatarUrl} name={post.author.name} size={36} />
+          <div>
+            <p className="font-medium text-sm">
+              {post.author.name ?? "Someone"}
+              {post.author.companyName && (
+                <span className="text-muted-foreground"> · {post.author.companyName}</span>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              @{post.author.username} · {formatDate(post.createdAt)}
+            </p>
+          </div>
+          {!isAuthor && (
+            <button
+              onClick={onToggleFollow}
+              disabled={followingAuthor}
+              className={
+                post.author.isFollowedByMe
+                  ? "text-xs border border-border rounded-full px-2.5 py-0.5 text-muted-foreground disabled:opacity-50"
+                  : "text-xs border border-primary text-primary rounded-full px-2.5 py-0.5 disabled:opacity-50"
+              }
+            >
+              {post.author.isFollowedByMe ? "Following" : "Follow"}
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-xs px-2 py-0.5 rounded-full ${POST_KIND_BADGE[post.kind]}`}>
@@ -150,6 +177,13 @@ export function PostCard({
         </button>
         <button onClick={toggleComments} className="text-muted-foreground">
           Comments · {post.commentCount}
+        </button>
+        <button
+          onClick={onToggleSave}
+          disabled={saving}
+          className={post.savedByMe ? "text-primary font-medium" : "text-muted-foreground"}
+        >
+          {post.savedByMe ? "Saved" : "Save"}
         </button>
 
         {post.kind === "JOB" && viewerRole === "JOB_SEEKER" && (

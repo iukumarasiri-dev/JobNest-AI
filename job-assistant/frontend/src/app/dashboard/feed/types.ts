@@ -1,8 +1,11 @@
 export type PostAuthor = {
   id: string;
   name: string | null;
+  username: string;
+  avatarUrl: string | null;
   role: "JOB_SEEKER" | "EMPLOYER";
   companyName: string | null;
+  isFollowedByMe: boolean;
 };
 
 export type Post = {
@@ -20,6 +23,7 @@ export type Post = {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  savedByMe: boolean;
   appliedByMe?: boolean;
 };
 

@@ -1,30 +1,69 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { Avatar } from "@/components/avatar";
+import { PostSummaryList } from "@/components/post-summary-list";
+import type { Post } from "@/app/dashboard/feed/types";
+
+type Tab = "posts" | "messages" | "saved";
 
 type Me = {
   id: string;
   email: string;
   name: string | null;
+  username: string;
+  avatarUrl: string | null;
+  bannerUrl: string | null;
+  jobRole: string | null;
+  location: string | null;
+  birthDate: string | null;
+  createdAt: string;
+  followerCount: number;
+  followingCount: number;
 };
+
+const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024; // stays comfortably under the backend's ~2MB decoded cap
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatBirthDate(iso: string) {
+  return `Born ${new Date(iso).toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })}`;
+}
+
+function formatJoinedDate(iso: string) {
+  return `Joined ${new Date(iso).toLocaleDateString(undefined, { month: "long", year: "numeric" })}`;
+}
 
 export function ProfileCard() {
   const [me, setMe] = useState<Me | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  const [name, setName] = useState("");
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileError, setProfileError] = useState("");
-  const [profileNotice, setProfileNotice] = useState("");
+  const [activeTab, setActiveTab] = useState<Tab>("posts");
+  const [myPosts, setMyPosts] = useState<Post[] | null>(null);
+  const [myPostsLoading, setMyPostsLoading] = useState(false);
+  const [savedPosts, setSavedPosts] = useState<Post[] | null>(null);
+  const [savedPostsLoading, setSavedPostsLoading] = useState(false);
 
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [savingPassword, setSavingPassword] = useState(false);
-  const [passwordError, setPasswordError] = useState("");
-  const [passwordNotice, setPasswordNotice] = useState("");
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [bannerSaving, setBannerSaving] = useState(false);
+  const [bannerError, setBannerError] = useState("");
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     setPageLoading(true);
@@ -32,7 +71,6 @@ export function ProfileCard() {
     try {
       const data = await apiFetch("/api/auth/me");
       setMe(data);
-      setName(data.name ?? "");
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load your profile.");
     } finally {
@@ -44,55 +82,72 @@ export function ProfileCard() {
     load();
   }, []);
 
-  async function handleProfileSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingProfile(true);
-    setProfileError("");
-    setProfileNotice("");
+  async function loadMyPosts() {
+    setMyPostsLoading(true);
     try {
-      const data = await apiFetch("/api/auth/me", {
-        method: "PATCH",
-        body: JSON.stringify({ name }),
-      });
-      setMe(data);
-      setProfileNotice("Profile updated.");
-    } catch (err) {
-      setProfileError(err instanceof Error ? err.message : "Failed to update your profile.");
+      setMyPosts(await apiFetch("/api/posts/mine"));
+    } catch {
+      setMyPosts([]);
     } finally {
-      setSavingProfile(false);
+      setMyPostsLoading(false);
     }
   }
 
-  async function handlePasswordSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setPasswordError("");
-    setPasswordNotice("");
-    if (newPassword !== confirmPassword) {
-      setPasswordError("New password and confirmation don't match.");
+  async function loadSavedPosts() {
+    setSavedPostsLoading(true);
+    try {
+      setSavedPosts(await apiFetch("/api/posts/saved"));
+    } catch {
+      setSavedPosts([]);
+    } finally {
+      setSavedPostsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "posts") loadMyPosts();
+    if (activeTab === "saved") loadSavedPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  async function handleImageChange(field: "avatarUrl" | "bannerUrl", file: File | undefined) {
+    if (!file) return;
+    const setSaving = field === "avatarUrl" ? setAvatarSaving : setBannerSaving;
+    const setError = field === "avatarUrl" ? setAvatarError : setBannerError;
+
+    setError("");
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
       return;
     }
-    setSavingPassword(true);
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError("Image is too large (max 1.5MB).");
+      return;
+    }
+
+    setSaving(true);
     try {
-      await apiFetch("/api/auth/change-password", {
-        method: "POST",
-        body: JSON.stringify({ currentPassword, newPassword }),
+      const dataUrl = await readFileAsDataUrl(file);
+      const data = await apiFetch("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({ [field]: dataUrl }),
       });
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setPasswordNotice("Password changed.");
+      setMe(data);
     } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : "Failed to change your password.");
+      setError(err instanceof Error ? err.message : "Failed to upload image.");
     } finally {
-      setSavingPassword(false);
+      setSaving(false);
     }
   }
 
   if (pageLoading) {
     return (
-      <div className="border border-border rounded-lg p-4 animate-pulse space-y-3">
-        <div className="h-3 w-20 bg-muted rounded" />
-        <div className="h-9 bg-muted rounded" />
+      <div className="border border-border rounded-lg overflow-hidden animate-pulse">
+        <div className="h-28 bg-muted" />
+        <div className="p-4 space-y-3">
+          <div className="h-3 w-20 bg-muted rounded" />
+          <div className="h-9 bg-muted rounded" />
+        </div>
       </div>
     );
   }
@@ -110,95 +165,134 @@ export function ProfileCard() {
 
   return (
     <div className="space-y-8">
-      <form onSubmit={handleProfileSubmit} className="border border-border rounded-lg p-4 space-y-3">
-        <h2 className="font-semibold text-sm">Account details</h2>
-
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Email</label>
-          <input
-            value={me?.email ?? ""}
-            disabled
-            className="w-full border border-border rounded p-2 bg-muted text-muted-foreground text-sm"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="name" className="text-xs text-muted-foreground mb-1 block">
-            Name
-          </label>
-          <input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full border border-border rounded p-2 bg-background text-sm"
-          />
-        </div>
-
-        {profileError && <p className="text-sm text-destructive">{profileError}</p>}
-        {profileNotice && <p className="text-sm text-primary">{profileNotice}</p>}
-
-        <button
-          type="submit"
-          disabled={savingProfile}
-          className="border border-border rounded px-4 py-2 text-sm disabled:opacity-50"
+      <div className="border border-border rounded-lg overflow-hidden">
+        <div
+          className="h-28 bg-muted relative bg-cover bg-center"
+          style={me?.bannerUrl ? { backgroundImage: `url(${me.bannerUrl})` } : undefined}
         >
-          {savingProfile ? "Saving..." : "Save changes"}
-        </button>
-      </form>
-
-      <form onSubmit={handlePasswordSubmit} className="border border-border rounded-lg p-4 space-y-3">
-        <h2 className="font-semibold text-sm">Change password</h2>
-
-        <div>
-          <label htmlFor="currentPassword" className="text-xs text-muted-foreground mb-1 block">
-            Current password
-          </label>
           <input
-            id="currentPassword"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            className="w-full border border-border rounded p-2 bg-background text-sm"
+            ref={bannerInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleImageChange("bannerUrl", e.target.files?.[0])}
           />
+          <button
+            type="button"
+            onClick={() => bannerInputRef.current?.click()}
+            disabled={bannerSaving}
+            className="absolute bottom-2 right-2 size-6 rounded-full bg-background/90 border border-border text-xs disabled:opacity-50"
+            title="Change banner"
+          >
+            {bannerSaving ? "…" : "✎"}
+          </button>
         </div>
 
-        <div>
-          <label htmlFor="newPassword" className="text-xs text-muted-foreground mb-1 block">
-            New password
-          </label>
-          <input
-            id="newPassword"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full border border-border rounded p-2 bg-background text-sm"
-          />
+        <div className="px-4 pb-4">
+          <div className="-mt-8 flex items-end justify-between">
+            <div className="relative">
+              <Avatar
+                src={me?.avatarUrl}
+                name={me?.name}
+                size={72}
+                className="border-4 border-background bg-background"
+              />
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleImageChange("avatarUrl", e.target.files?.[0])}
+              />
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={avatarSaving}
+                className="absolute -bottom-1 -right-1 size-6 rounded-full bg-background border border-border text-xs disabled:opacity-50"
+                title="Change photo"
+              >
+                {avatarSaving ? "…" : "✎"}
+              </button>
+            </div>
+          </div>
+
+          {(avatarError || bannerError) && (
+            <p className="text-xs text-destructive mt-2">{avatarError || bannerError}</p>
+          )}
+
+          <div className="mt-2">
+            <p className="font-semibold">{me?.name || "Unnamed"}</p>
+            <p className="text-sm text-muted-foreground">@{me?.username}</p>
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>💼 {me?.jobRole || "Not set"}</span>
+            <span>📌 {me?.location || "Not set"}</span>
+            <span>🎂 {me?.birthDate ? formatBirthDate(me.birthDate) : "Not set"}</span>
+          </div>
+
+          {me?.createdAt && (
+            <div className="mt-1 text-xs text-muted-foreground">📅 {formatJoinedDate(me.createdAt)}</div>
+          )}
+
+          <div className="mt-3 flex gap-4 text-sm">
+            <span>
+              <span className="font-semibold">{me?.followingCount ?? 0}</span>{" "}
+              <span className="text-muted-foreground">Following</span>
+            </span>
+            <span>
+              <span className="font-semibold">{me?.followerCount ?? 0}</span>{" "}
+              <span className="text-muted-foreground">Followers</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="border border-border rounded-lg overflow-hidden">
+        <div className="flex text-sm">
+          {(
+            [
+              ["posts", "Posts"],
+              ["messages", "Messages"],
+              ["saved", "Saved"],
+            ] as const
+          ).map(([tab, label]) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 py-2.5 border-b-2 transition-colors ${
+                activeTab === tab
+                  ? "border-primary text-foreground font-medium"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        <div>
-          <label htmlFor="confirmPassword" className="text-xs text-muted-foreground mb-1 block">
-            Confirm new password
-          </label>
-          <input
-            id="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full border border-border rounded p-2 bg-background text-sm"
-          />
+        <div className="p-3">
+          {activeTab === "posts" && (
+            <PostSummaryList
+              posts={myPosts ?? []}
+              loading={myPostsLoading}
+              emptyMessage="You haven't posted anything yet."
+            />
+          )}
+          {activeTab === "messages" && (
+            <p className="text-xs text-muted-foreground py-2">
+              Messaging is coming soon — you'll be able to message other users here.
+            </p>
+          )}
+          {activeTab === "saved" && (
+            <PostSummaryList
+              posts={savedPosts ?? []}
+              loading={savedPostsLoading}
+              emptyMessage="You haven't saved any posts yet."
+            />
+          )}
         </div>
-
-        {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
-        {passwordNotice && <p className="text-sm text-primary">{passwordNotice}</p>}
-
-        <button
-          type="submit"
-          disabled={savingPassword}
-          className="border border-border rounded px-4 py-2 text-sm disabled:opacity-50"
-        >
-          {savingPassword ? "Saving..." : "Change password"}
-        </button>
-      </form>
+      </div>
     </div>
   );
 }
