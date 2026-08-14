@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_URL } from "@/lib/api";
 import styles from "./login.module.css";
 
 type LoginFormData = {
@@ -13,8 +13,9 @@ type LoginFormData = {
 
 type LoginErrors = Partial<Record<keyof LoginFormData | "form", string>>;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState<LoginFormData>({
     identifier: "",
     password: "",
@@ -23,6 +24,15 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("error") === "google_auth_failed") {
+      setErrors((prev) => ({
+        ...prev,
+        form: "Google sign-in didn't work. Please try again or log in with your email.",
+      }));
+    }
+  }, [searchParams]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.name as keyof LoginFormData;
@@ -141,12 +151,19 @@ export default function LoginPage() {
             <div className={styles.dividerLine} />
           </div>
 
-          <button type="button" className={styles.googleBtn}>
-            
+          <a href={`${API_URL}/api/auth/google`} className={styles.googleBtn}>
             Continue with Google
-          </button>
+          </a>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
