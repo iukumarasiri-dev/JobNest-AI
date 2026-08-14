@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { LayoutDashboard, Briefcase, FileText, UserCircle, Building2, Menu, X } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, Building2, Menu, X, Rss } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -12,24 +12,29 @@ const JOB_SEEKER_NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/applications", label: "Applications", icon: Briefcase },
   { href: "/dashboard/resumes", label: "Resumes", icon: FileText },
-  { href: "/dashboard/profile", label: "Profile", icon: UserCircle },
+  { href: "/dashboard/feed", label: "Feed", icon: Rss },
 ];
 
 const EMPLOYER_NAV_ITEMS = [
   { href: "/dashboard/company", label: "Company Profile", icon: Building2 },
-  { href: "/dashboard/profile", label: "Profile", icon: UserCircle },
+  { href: "/dashboard/feed", label: "Feed", icon: Rss },
 ];
 
 const EMPLOYER_ONLY_PREFIXES = ["/dashboard/company"];
-const JOB_SEEKER_ONLY_PATHS = ["/dashboard", "/dashboard/applications", "/dashboard/resumes"];
+// "/dashboard" is deliberately matched exactly (not as a prefix) — every other
+// dashboard route lives under "/dashboard/...", so a prefix match here would
+// wrongly claim every shared/employer route (feed, profile, company) too.
+const JOB_SEEKER_ONLY_EXACT = ["/dashboard"];
+const JOB_SEEKER_ONLY_PREFIXES = ["/dashboard/applications", "/dashboard/resumes"];
 
 function isEmployerOnlyPath(pathname: string) {
   return EMPLOYER_ONLY_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 function isJobSeekerOnlyPath(pathname: string) {
-  return JOB_SEEKER_ONLY_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  return (
+    JOB_SEEKER_ONLY_EXACT.includes(pathname) ||
+    JOB_SEEKER_ONLY_PREFIXES.some((prefix) => pathname.startsWith(prefix))
   );
 }
 
