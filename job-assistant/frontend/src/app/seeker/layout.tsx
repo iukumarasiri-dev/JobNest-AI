@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Briefcase, FileText, Rss } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, Rss, MessageCircle } from "lucide-react";
 import { DashboardShell, type NavItem } from "@/components/dashboard-shell";
 
 const JOB_SEEKER_NAV_ITEMS: NavItem[] = [
@@ -14,6 +14,7 @@ const JOB_SEEKER_NAV_ITEMS: NavItem[] = [
     ],
   },
   { href: "/seeker/feed", label: "Feed", icon: Rss },
+  { href: "/seeker/messages", label: "Messages", icon: MessageCircle },
 ];
 
 export default function SeekerLayout({ children }: { children: React.ReactNode }) {

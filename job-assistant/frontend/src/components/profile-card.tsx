@@ -1,11 +1,13 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Avatar } from "@/components/avatar";
 import { PostSummaryList } from "@/components/post-summary-list";
 import type { Post } from "@/features/feed/types";
+import { formatBirthDate, formatJoinedDate, formatRelativeTime } from "@/lib/formatDate";
 
 type Tab = "posts" | "messages" | "saved";
 
@@ -20,6 +22,7 @@ type Me = {
   location: string | null;
   birthDate: string | null;
   createdAt: string;
+  role: "JOB_SEEKER" | "EMPLOYER";
   followerCount: number;
   followingCount: number;
 };
@@ -45,7 +48,7 @@ type FollowModalState = {
 type AppNotification = {
   id: string;
   type: string;
-  actor: { id: string; name: string | null; username: string; avatarUrl: string | null };
+  actor: { id: string; name: string | null; username: string; avatarUrl: string | null; isFollowedByMe: boolean };
   createdAt: string;
   read: boolean;
 };
@@ -61,34 +64,12 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function formatBirthDate(iso: string) {
-  return `Born ${new Date(iso).toLocaleDateString(undefined, {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  })}`;
-}
-
-function formatJoinedDate(iso: string) {
-  return `Joined ${new Date(iso).toLocaleDateString(undefined, { month: "long", year: "numeric" })}`;
-}
-
-function formatNotificationTime(iso: string) {
-  const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
 export type ProfileCardHandle = {
   adjustFollowingCount: (delta: number) => void;
 };
 
 export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_props, ref) {
+  const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -100,6 +81,9 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
   const [savedPostsLoading, setSavedPostsLoading] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const [notificationActionsFor, setNotificationActionsFor] = useState<AppNotification | null>(null);
+  const [followBackSaving, setFollowBackSaving] = useState(false);
+  const [chatStarting, setChatStarting] = useState(false);
 
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [avatarError, setAvatarError] = useState("");
@@ -244,6 +228,48 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
       await apiFetch("/api/notifications/read-all", { method: "POST" });
     } catch {
       // best-effort — a later refresh will resync the real state
+    }
+  }
+
+  function handleSeeProfile(username: string) {
+    setNotificationActionsFor(null);
+    router.push(`/profile/${username}`);
+  }
+
+  async function handleFollowBackFromNotification(actorId: string) {
+    setFollowBackSaving(true);
+    try {
+      const data = await apiFetch(`/api/users/${actorId}/follow`, { method: "POST" });
+      setNotifications((prev) =>
+        prev.map((n) => (n.actor.id === actorId ? { ...n, actor: { ...n.actor, isFollowedByMe: data.following } } : n))
+      );
+      setNotificationActionsFor((prev) =>
+        prev && prev.actor.id === actorId ? { ...prev, actor: { ...prev.actor, isFollowedByMe: data.following } } : prev
+      );
+      setMe((prev) =>
+        prev ? { ...prev, followingCount: Math.max(0, prev.followingCount + (data.following ? 1 : -1)) } : prev
+      );
+    } catch {
+      // leave state as-is; the button stays in its current state for a retry
+    } finally {
+      setFollowBackSaving(false);
+    }
+  }
+
+  async function handleChatFromNotification(actorId: string) {
+    if (!me) return;
+    setChatStarting(true);
+    try {
+      const conversation = await apiFetch("/api/conversations", {
+        method: "POST",
+        body: JSON.stringify({ userId: actorId }),
+      });
+      setNotificationActionsFor(null);
+      router.push(`/${me.role === "EMPLOYER" ? "employer" : "seeker"}/messages?c=${conversation.id}`);
+    } catch {
+      // panel stays open with the Chat button re-enabled for a retry
+    } finally {
+      setChatStarting(false);
     }
   }
 
@@ -457,9 +483,13 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
                 </p>
               )}
               {notifications.map((n) => (
-                <div
+                <button
                   key={n.id}
-                  className={`flex items-center gap-2.5 rounded-lg p-2 ${n.read ? "" : "bg-primary/5"}`}
+                  type="button"
+                  onClick={() => setNotificationActionsFor(n)}
+                  className={`flex w-full items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-muted ${
+                    n.read ? "" : "bg-primary/5"
+                  }`}
                 >
                   <Avatar src={n.actor.avatarUrl} name={n.actor.name} size={32} />
                   <div className="min-w-0 flex-1">
@@ -469,10 +499,10 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
                         {n.type === "FOLLOW" ? "followed you" : "sent an update"}
                       </span>
                     </p>
-                    <p className="text-[10px] text-muted-foreground">{formatNotificationTime(n.createdAt)}</p>
+                    <p className="text-[10px] text-muted-foreground">{formatRelativeTime(n.createdAt)}</p>
                   </div>
                   {!n.read && <span className="size-1.5 shrink-0 rounded-full bg-primary" />}
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -549,6 +579,74 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
                     )}
                   </div>
                 ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notificationActionsFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setNotificationActionsFor(null)}
+        >
+          <div
+            className="w-full max-w-xs rounded-lg border border-border bg-background p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium">Notification</p>
+              <button
+                type="button"
+                onClick={() => setNotificationActionsFor(null)}
+                aria-label="Close"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="mb-4 flex items-center gap-2.5">
+              <Avatar
+                src={notificationActionsFor.actor.avatarUrl}
+                name={notificationActionsFor.actor.name}
+                size={40}
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">
+                  {notificationActionsFor.actor.name || notificationActionsFor.actor.username}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">@{notificationActionsFor.actor.username}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => handleSeeProfile(notificationActionsFor.actor.username)}
+                className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted"
+              >
+                See profile
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFollowBackFromNotification(notificationActionsFor.actor.id)}
+                disabled={followBackSaving}
+                className={
+                  notificationActionsFor.actor.isFollowedByMe
+                    ? "rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground disabled:opacity-50"
+                    : "rounded-lg border border-primary px-3 py-2 text-sm text-primary disabled:opacity-50"
+                }
+              >
+                {notificationActionsFor.actor.isFollowedByMe ? "Following" : "Follow back"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChatFromNotification(notificationActionsFor.actor.id)}
+                disabled={chatStarting}
+                className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+              >
+                {chatStarting ? "Starting chat…" : "Chat"}
+              </button>
             </div>
           </div>
         </div>

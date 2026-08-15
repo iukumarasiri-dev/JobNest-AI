@@ -1,12 +1,13 @@
 "use client";
 
-import { LayoutDashboard, Building2, Rss } from "lucide-react";
+import { LayoutDashboard, Building2, Rss, MessageCircle } from "lucide-react";
 import { DashboardShell, type NavItem } from "@/components/dashboard-shell";
 
 const EMPLOYER_NAV_ITEMS: NavItem[] = [
   { href: "/employer/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/employer/company", label: "Company Profile", icon: Building2 },
   { href: "/employer/feed", label: "Feed", icon: Rss },
+  { href: "/employer/messages", label: "Messages", icon: MessageCircle },
 ];
 
 export default function EmployerLayout({ children }: { children: React.ReactNode }) {
