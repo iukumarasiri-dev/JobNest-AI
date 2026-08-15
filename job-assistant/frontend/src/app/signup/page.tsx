@@ -101,7 +101,7 @@ export default function SignupPage() {
           ...(role === "EMPLOYER" ? { companyName: formData.companyName.trim() } : {}),
         }),
       });
-      router.push(role === "EMPLOYER" ? "/dashboard/company" : "/dashboard");
+      router.push(role === "EMPLOYER" ? "/employer/dashboard" : "/seeker/dashboard");
       router.refresh();
     } catch (err) {
       setErrors((prev) => ({

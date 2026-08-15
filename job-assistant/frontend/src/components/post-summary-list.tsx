@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Post } from "@/app/dashboard/feed/types";
+import type { Post } from "@/features/feed/types";
 import { POST_KIND_BADGE } from "@/lib/postKind";
 
 function formatDate(iso: string) {

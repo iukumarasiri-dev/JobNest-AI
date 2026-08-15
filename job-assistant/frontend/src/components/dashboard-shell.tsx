@@ -5,58 +5,32 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Briefcase, FileText, Building2, Menu, X, Rss, ChevronDown, LogOut } from "lucide-react";
+import { Menu, X, ChevronDown, LogOut } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-type NavItem = {
+export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
   children?: { href: string; label: string; icon: LucideIcon }[];
 };
 
-const JOB_SEEKER_NAV_ITEMS: NavItem[] = [
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    children: [
-      { href: "/dashboard/applications", label: "Applications", icon: Briefcase },
-      { href: "/dashboard/resumes", label: "Resumes", icon: FileText },
-    ],
-  },
-  { href: "/dashboard/feed", label: "Feed", icon: Rss },
-];
-
-const EMPLOYER_NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/company", label: "Company Profile", icon: Building2 },
-  { href: "/dashboard/feed", label: "Feed", icon: Rss },
-];
-
-const EMPLOYER_ONLY_PREFIXES = ["/dashboard/company"];
-// "/dashboard" itself is shared — dashboard/page.tsx renders a different view
-// per role, so it's deliberately left out of both role-only lists below.
-const JOB_SEEKER_ONLY_EXACT: string[] = [];
-const JOB_SEEKER_ONLY_PREFIXES = ["/dashboard/applications", "/dashboard/resumes"];
-
-function isEmployerOnlyPath(pathname: string) {
-  return EMPLOYER_ONLY_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-}
-
-function isJobSeekerOnlyPath(pathname: string) {
-  return (
-    JOB_SEEKER_ONLY_EXACT.includes(pathname) ||
-    JOB_SEEKER_ONLY_PREFIXES.some((prefix) => pathname.startsWith(prefix))
-  );
-}
-
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export function DashboardShell({
+  requiredRole,
+  otherRoleDashboardHref,
+  navItems,
+  children,
+}: {
+  requiredRole: "EMPLOYER" | "JOB_SEEKER";
+  otherRoleDashboardHref: string;
+  navItems: NavItem[];
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
-  const [dashboardMenuOpen, setDashboardMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const [role, setRole] = useState<"JOB_SEEKER" | "EMPLOYER" | null>(null);
   const [roleChecked, setRoleChecked] = useState(false);
@@ -74,17 +48,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.replace("/login");
   }, [roleChecked, authFailed, router]);
 
-  const roleMismatch =
-    !!role &&
-    ((role === "EMPLOYER" && isJobSeekerOnlyPath(pathname)) ||
-      (role === "JOB_SEEKER" && isEmployerOnlyPath(pathname)));
+  const roleMismatch = roleChecked && !authFailed && role !== requiredRole;
 
   useEffect(() => {
-    if (!roleChecked || !roleMismatch || !role) return;
-    router.replace(role === "EMPLOYER" ? "/dashboard/company" : "/dashboard");
-  }, [roleChecked, roleMismatch, role, router]);
-
-  const NAV_ITEMS = role === "EMPLOYER" ? EMPLOYER_NAV_ITEMS : JOB_SEEKER_NAV_ITEMS;
+    if (!roleMismatch) return;
+    router.replace(otherRoleDashboardHref);
+  }, [roleMismatch, otherRoleDashboardHref, router]);
 
   async function handleLogout() {
     setLogoutError("");
@@ -98,7 +67,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   function isActive(href: string) {
-    return href === "/dashboard" ? pathname === href : pathname.startsWith(href);
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
   function isParentActive(item: NavItem) {
@@ -106,8 +75,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   useEffect(() => {
-    setDashboardMenuOpen(false);
+    setDropdownOpen(false);
   }, [pathname]);
+
+  const showNav = roleChecked && !authFailed && !roleMismatch;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -124,7 +95,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             />
 
             <nav className="hidden md:flex items-center gap-1">
-              {roleChecked && !authFailed && NAV_ITEMS.map((item) => {
+              {showNav && navItems.map((item) => {
                 const { href, label, icon: Icon, children } = item;
                 const active = isParentActive(item);
 
@@ -151,8 +122,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div
                     key={href}
                     className="relative"
-                    onMouseEnter={() => setDashboardMenuOpen(true)}
-                    onMouseLeave={() => setDashboardMenuOpen(false)}
+                    onMouseEnter={() => setDropdownOpen(true)}
+                    onMouseLeave={() => setDropdownOpen(false)}
                   >
                     <div
                       className={
@@ -168,18 +139,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </Link>
                       <button
                         type="button"
-                        onClick={() => setDashboardMenuOpen((v) => !v)}
+                        onClick={() => setDropdownOpen((v) => !v)}
                         aria-label={`Toggle ${label} menu`}
-                        aria-expanded={dashboardMenuOpen}
+                        aria-expanded={dropdownOpen}
                         className="pr-2 pl-0.5 py-1.5"
                       >
                         <ChevronDown
-                          className={`size-3.5 transition-transform ${dashboardMenuOpen ? "rotate-180" : ""}`}
+                          className={`size-3.5 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
                         />
                       </button>
                     </div>
 
-                    {dashboardMenuOpen && (
+                    {dropdownOpen && (
                       <div className="absolute top-full left-0 pt-1 min-w-[170px] z-20">
                         <div className="border border-border rounded-lg bg-background shadow-md py-1">
                           {children.map((child) => {
@@ -231,9 +202,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        {navOpen && (
+        {navOpen && showNav && (
           <nav className="md:hidden border-t border-border p-4 flex flex-col gap-1">
-            {NAV_ITEMS.map(({ href, label, icon: Icon, children }) => {
+            {navItems.map(({ href, label, icon: Icon, children }) => {
               const active = isActive(href);
               return (
                 <div key={href}>
@@ -285,9 +256,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {logoutError && <p className="text-sm text-destructive px-4 pt-4">{logoutError}</p>}
 
-      <main className="p-4 sm:p-6">
-        {!roleChecked || authFailed || roleMismatch ? null : children}
-      </main>
+      <main className="p-4 sm:p-6">{showNav ? children : null}</main>
     </div>
   );
 }

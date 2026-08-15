@@ -4,8 +4,8 @@ import { useRef } from "react";
 import { RefreshCw } from "lucide-react";
 import { ProfileCard, type ProfileCardHandle } from "@/components/profile-card";
 import { useFeed } from "./useFeed";
-import { PostComposer } from "./_components/PostComposer";
-import { PostList } from "./_components/PostList";
+import { PostComposer } from "./components/PostComposer";
+import { PostList } from "./components/PostList";
 
 export default function FeedPage() {
   const profileCardRef = useRef<ProfileCardHandle>(null);

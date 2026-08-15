@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Avatar } from "@/components/avatar";
 import { PostSummaryList } from "@/components/post-summary-list";
-import type { Post } from "@/app/dashboard/feed/types";
+import type { Post } from "@/features/feed/types";
 
 type Tab = "posts" | "messages" | "saved";
 

@@ -20,7 +20,7 @@ export function ApplicationList({
         >
           <div>
             <h3 className="font-semibold">
-              <a href={`/dashboard/applications/${a.id}`} className="hover:underline">
+              <a href={`/seeker/applications/${a.id}`} className="hover:underline">
                 {a.jobTitle} @ {a.companyName}
               </a>
             </h3>

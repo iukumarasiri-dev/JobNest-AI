@@ -59,7 +59,7 @@ function LoginForm() {
         method: "POST",
         body: JSON.stringify({ email: formData.identifier, password: formData.password }),
       });
-      router.push(data.role === "EMPLOYER" ? "/dashboard/company" : "/dashboard");
+      router.push(data.role === "EMPLOYER" ? "/employer/dashboard" : "/seeker/dashboard");
       router.refresh();
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong" });

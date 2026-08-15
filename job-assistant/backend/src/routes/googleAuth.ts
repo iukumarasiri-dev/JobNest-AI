@@ -89,7 +89,7 @@ googleAuthRouter.get("/callback", async (req, res) => {
     }
 
     await createSession(res, user.id);
-    res.redirect(frontendUrl(user.role === "EMPLOYER" ? "/dashboard/company" : "/dashboard"));
+    res.redirect(frontendUrl(user.role === "EMPLOYER" ? "/employer/dashboard" : "/seeker/dashboard"));
   } catch (err) {
     console.error("Google sign-in failed:", err);
     res.redirect(frontendUrl("/login?error=google_auth_failed"));
