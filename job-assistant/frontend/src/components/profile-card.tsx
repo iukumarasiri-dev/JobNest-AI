@@ -110,6 +110,24 @@ export function ProfileCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
+  async function handleDeleteMyPost(id: string) {
+    const previous = myPosts;
+    setMyPosts((prev) => (prev ?? []).filter((p) => p.id !== id));
+    try {
+      await apiFetch(`/api/posts/${id}`, { method: "DELETE" });
+    } catch {
+      setMyPosts(previous);
+    }
+  }
+
+  async function handleUpdateMyPost(id: string, updates: Record<string, unknown>) {
+    const updated = await apiFetch(`/api/posts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    });
+    setMyPosts((prev) => (prev ?? []).map((p) => (p.id === id ? updated : p)));
+  }
+
   async function handleImageChange(field: "avatarUrl" | "bannerUrl", file: File | undefined) {
     if (!file) return;
     const setSaving = field === "avatarUrl" ? setAvatarSaving : setBannerSaving;
@@ -277,6 +295,9 @@ export function ProfileCard() {
               posts={myPosts ?? []}
               loading={myPostsLoading}
               emptyMessage="You haven't posted anything yet."
+              editable
+              onDelete={handleDeleteMyPost}
+              onUpdate={handleUpdateMyPost}
             />
           )}
           {activeTab === "messages" && (
