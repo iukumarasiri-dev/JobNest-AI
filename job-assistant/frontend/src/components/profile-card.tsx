@@ -42,6 +42,14 @@ type FollowModalState = {
   error: string;
 };
 
+type AppNotification = {
+  id: string;
+  type: string;
+  actor: { id: string; name: string | null; username: string; avatarUrl: string | null };
+  createdAt: string;
+  read: boolean;
+};
+
 const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024; // stays comfortably under the backend's ~2MB decoded cap
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -65,6 +73,17 @@ function formatJoinedDate(iso: string) {
   return `Joined ${new Date(iso).toLocaleDateString(undefined, { month: "long", year: "numeric" })}`;
 }
 
+function formatNotificationTime(iso: string) {
+  const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export type ProfileCardHandle = {
   adjustFollowingCount: (delta: number) => void;
 };
@@ -79,6 +98,8 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
   const [myPostsLoading, setMyPostsLoading] = useState(false);
   const [savedPosts, setSavedPosts] = useState<Post[] | null>(null);
   const [savedPostsLoading, setSavedPostsLoading] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [avatarError, setAvatarError] = useState("");
@@ -147,8 +168,45 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
     }
   }
 
+  async function loadNotifications() {
+    try {
+      setNotifications(await apiFetch("/api/notifications"));
+    } catch {
+      // keep showing the last known state on failure
+    }
+  }
+
   useEffect(() => {
     load();
+    loadNotifications();
+  }, []);
+
+  // Follower/following counts and notifications change from other sessions
+  // (someone else follows you) with no push channel to notify this tab —
+  // revalidate on refocus so a tab left open picks up changes without needing
+  // a full page reload.
+  useEffect(() => {
+    async function silentRefresh() {
+      try {
+        setMe(await apiFetch("/api/auth/me"));
+      } catch {
+        // keep showing the last known state; the visible load() above already
+        // surfaces a retry UI for a hard failure on first mount
+      }
+      loadNotifications();
+    }
+    function handleFocus() {
+      silentRefresh();
+    }
+    function handleVisibility() {
+      if (document.visibilityState === "visible") silentRefresh();
+    }
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -179,9 +237,20 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
     }
   }
 
+  async function markNotificationsRead() {
+    if (!notifications.some((n) => !n.read)) return;
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await apiFetch("/api/notifications/read-all", { method: "POST" });
+    } catch {
+      // best-effort — a later refresh will resync the real state
+    }
+  }
+
   useEffect(() => {
     if (activeTab === "posts") loadMyPosts();
     if (activeTab === "saved") loadSavedPosts();
+    if (activeTab === "messages") markNotificationsRead();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -353,13 +422,18 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 border-b-2 transition-colors ${
+              className={`relative flex-1 py-2.5 border-b-2 transition-colors ${
                 activeTab === tab
                   ? "border-primary text-foreground font-medium"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {label}
+              {tab === "messages" && unreadCount > 0 && (
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
+                  {unreadCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -376,9 +450,31 @@ export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_p
             />
           )}
           {activeTab === "messages" && (
-            <p className="text-xs text-muted-foreground py-2">
-              Messaging is coming soon — you'll be able to message other users here.
-            </p>
+            <div className="space-y-1">
+              {notifications.length === 0 && (
+                <p className="text-xs text-muted-foreground py-2">
+                  No notifications yet — you&apos;ll see updates like new followers here.
+                </p>
+              )}
+              {notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className={`flex items-center gap-2.5 rounded-lg p-2 ${n.read ? "" : "bg-primary/5"}`}
+                >
+                  <Avatar src={n.actor.avatarUrl} name={n.actor.name} size={32} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs">
+                      <span className="font-medium">{n.actor.name || n.actor.username}</span>{" "}
+                      <span className="text-muted-foreground">
+                        {n.type === "FOLLOW" ? "followed you" : "sent an update"}
+                      </span>
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">{formatNotificationTime(n.createdAt)}</p>
+                  </div>
+                  {!n.read && <span className="size-1.5 shrink-0 rounded-full bg-primary" />}
+                </div>
+              ))}
+            </div>
           )}
           {activeTab === "saved" && (
             <PostSummaryList

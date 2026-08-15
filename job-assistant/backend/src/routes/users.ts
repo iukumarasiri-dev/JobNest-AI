@@ -51,6 +51,9 @@ usersRouter.post("/:id/follow", async (req, res) => {
     await prisma.follow.delete({ where: { id: existing.id } });
   } else {
     await prisma.follow.create({ data: { followerId: viewerId, followingId: targetId } });
+    await prisma.notification.create({
+      data: { recipientId: targetId, actorId: viewerId, type: "FOLLOW" },
+    });
   }
 
   const followerCount = await prisma.follow.count({ where: { followingId: targetId } });

@@ -9,6 +9,7 @@ import { resumesRouter } from "./routes/resumes.js";
 import { companyRouter } from "./routes/company.js";
 import { postsRouter } from "./routes/posts.js";
 import { usersRouter } from "./routes/users.js";
+import { notificationsRouter } from "./routes/notifications.js";
 
 export const app = express();
 
@@ -33,3 +34,4 @@ app.use("/api/resumes", resumesRouter);
 app.use("/api/company", companyRouter);
 app.use("/api/posts", postsRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/notifications", notificationsRouter);
