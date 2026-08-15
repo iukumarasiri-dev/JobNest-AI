@@ -22,8 +22,8 @@ export function DashboardShell({
   navItems,
   children,
 }: {
-  requiredRole: "EMPLOYER" | "JOB_SEEKER";
-  otherRoleDashboardHref: string;
+  requiredRole?: "EMPLOYER" | "JOB_SEEKER";
+  otherRoleDashboardHref?: string;
   navItems: NavItem[];
   children: React.ReactNode;
 }) {
@@ -48,10 +48,10 @@ export function DashboardShell({
     router.replace("/login");
   }, [roleChecked, authFailed, router]);
 
-  const roleMismatch = roleChecked && !authFailed && role !== requiredRole;
+  const roleMismatch = requiredRole != null && roleChecked && !authFailed && role !== requiredRole;
 
   useEffect(() => {
-    if (!roleMismatch) return;
+    if (!roleMismatch || !otherRoleDashboardHref) return;
     router.replace(otherRoleDashboardHref);
   }, [roleMismatch, otherRoleDashboardHref, router]);
 
@@ -180,14 +180,16 @@ export function DashboardShell({
               })}
             </nav>
 
-            <button
-              onClick={() => setNavOpen((v) => !v)}
-              aria-label="Toggle navigation menu"
-              aria-expanded={navOpen}
-              className="md:hidden border border-border rounded p-1.5 hover:bg-muted"
-            >
-              {navOpen ? <X className="size-4" /> : <Menu className="size-4" />}
-            </button>
+            {navItems.length > 0 && (
+              <button
+                onClick={() => setNavOpen((v) => !v)}
+                aria-label="Toggle navigation menu"
+                aria-expanded={navOpen}
+                className="md:hidden border border-border rounded p-1.5 hover:bg-muted"
+              >
+                {navOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
