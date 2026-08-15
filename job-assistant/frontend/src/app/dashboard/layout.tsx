@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Briefcase, FileText, Building2, Menu, X, Rss, ChevronDown } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, Building2, Menu, X, Rss, ChevronDown, LogOut } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -221,8 +221,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <button onClick={handleLogout} className="text-sm underline">
-              Log out
+            <button
+              onClick={handleLogout}
+              aria-label="Log out"
+              className="flex items-center justify-center rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <LogOut className="size-4" />
             </button>
           </div>
         </div>
