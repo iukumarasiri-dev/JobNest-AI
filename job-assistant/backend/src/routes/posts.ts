@@ -2,7 +2,15 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { requireEmployer } from "../middleware/requireEmployer.js";
 import { requireJobSeeker } from "../middleware/requireJobSeeker.js";
-import { listPosts, listMyPosts, listSavedPosts, createPost, getPost, deletePost } from "./posts/crud.js";
+import {
+  listPosts,
+  listMyPosts,
+  listSavedPosts,
+  createPost,
+  getPost,
+  updatePost,
+  deletePost,
+} from "./posts/crud.js";
 import { toggleLike, toggleSave, listComments, createComment } from "./posts/interactions.js";
 import { applyToPost, listApplicants } from "./posts/apply.js";
 
@@ -17,6 +25,7 @@ postsRouter.get("/saved", listSavedPosts);
 postsRouter.get("/", listPosts);
 postsRouter.post("/", createPost);
 postsRouter.get("/:id", getPost);
+postsRouter.patch("/:id", updatePost);
 postsRouter.delete("/:id", deletePost);
 
 postsRouter.post("/:id/like", toggleLike);

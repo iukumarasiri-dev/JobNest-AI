@@ -49,6 +49,19 @@ const jobPostSchema = z.object({
 
 export const createPostSchema = z.discriminatedUnion("kind", [textPostSchema, jobPostSchema]);
 
+// Kind can't change after creation — the handler only applies the fields
+// relevant to the post's existing kind.
+export const updatePostSchema = z.object({
+  body: z.string().min(1).optional(),
+  title: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  location: z.string().optional(),
+  salaryRange: z.string().optional(),
+  videoUrl: videoUrlSchema,
+  attachmentUrl: attachmentUrlSchema,
+  attachmentName: attachmentNameSchema,
+});
+
 export const commentSchema = z.object({
   body: z.string().min(1),
 });

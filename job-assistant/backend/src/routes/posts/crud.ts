@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { prisma } from "../../lib/db.js";
-import { createPostSchema } from "./schemas.js";
+import { createPostSchema, updatePostSchema } from "./schemas.js";
 
 const authorSelect = {
   id: true,
@@ -161,6 +161,40 @@ export async function createPost(req: Request, res: Response) {
 export async function getPost(req: Request, res: Response) {
   const [shaped] = await fetchAndShapePosts({ id: req.params.id }, req.user!.id);
   if (!shaped) return res.status(404).json({ error: "Not found" });
+  res.json(shaped);
+}
+
+export async function updatePost(req: Request, res: Response) {
+  const existing = await prisma.post.findFirst({
+    where: { id: req.params.id, authorId: req.user!.id },
+  });
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const parsed = updatePostSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const { videoUrl, attachmentUrl, attachmentName, body, title, description, location, salaryRange } =
+    parsed.data;
+
+  await prisma.post.update({
+    where: { id: existing.id },
+    data: {
+      // Only the fields relevant to this post's existing kind are ever sent
+      // by the client, but scope defensively anyway — kind itself can't change.
+      ...(existing.kind === "TEXT" && body !== undefined ? { body } : {}),
+      ...(existing.kind === "JOB" && title !== undefined ? { title } : {}),
+      ...(existing.kind === "JOB" && description !== undefined ? { description } : {}),
+      ...(existing.kind === "JOB" && location !== undefined ? { location } : {}),
+      ...(existing.kind === "JOB" && salaryRange !== undefined ? { salaryRange } : {}),
+      ...(videoUrl !== undefined ? { videoUrl: videoUrl || null } : {}),
+      ...(attachmentUrl !== undefined ? { attachmentUrl: attachmentUrl || null } : {}),
+      ...(attachmentName !== undefined ? { attachmentName: attachmentName || null } : {}),
+    },
+  });
+
+  const [shaped] = await fetchAndShapePosts({ id: existing.id }, req.user!.id);
   res.json(shaped);
 }
 
