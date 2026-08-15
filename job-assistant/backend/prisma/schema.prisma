@@ -43,6 +43,10 @@ model User {
 
   notificationsReceived Notification[] @relation("NotificationsReceived")
   notificationsSent     Notification[] @relation("NotificationsSent")
+
+  conversationsAsUserA Conversation[] @relation("ConversationsAsUserA")
+  conversationsAsUserB Conversation[] @relation("ConversationsAsUserB")
+  messages             Message[]
 }
 
 model Follow {
@@ -67,6 +71,36 @@ model Notification {
   createdAt   DateTime  @default(now())
 
   @@index([recipientId, createdAt])
+}
+
+// userAId/userBId are always stored with userAId < userBId (sorted at the
+// application level) so the pair is unique regardless of who started it.
+model Conversation {
+  id              String    @id @default(uuid())
+  userAId         String
+  userA           User      @relation("ConversationsAsUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId         String
+  userB           User      @relation("ConversationsAsUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  userALastReadAt DateTime?
+  userBLastReadAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  messages Message[]
+
+  @@unique([userAId, userBId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body           String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
 }
 
 model Session {
