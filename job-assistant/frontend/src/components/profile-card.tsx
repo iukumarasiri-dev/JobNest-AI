@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Avatar } from "@/components/avatar";
 import { PostSummaryList } from "@/components/post-summary-list";
@@ -21,6 +22,24 @@ type Me = {
   createdAt: string;
   followerCount: number;
   followingCount: number;
+};
+
+type FollowListType = "following" | "followers";
+
+type FollowUser = {
+  id: string;
+  name: string | null;
+  username: string;
+  avatarUrl: string | null;
+  role: "JOB_SEEKER" | "EMPLOYER";
+  isFollowedByMe: boolean;
+};
+
+type FollowModalState = {
+  type: FollowListType;
+  users: FollowUser[];
+  loading: boolean;
+  error: string;
 };
 
 const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024; // stays comfortably under the backend's ~2MB decoded cap
@@ -46,7 +65,11 @@ function formatJoinedDate(iso: string) {
   return `Joined ${new Date(iso).toLocaleDateString(undefined, { month: "long", year: "numeric" })}`;
 }
 
-export function ProfileCard() {
+export type ProfileCardHandle = {
+  adjustFollowingCount: (delta: number) => void;
+};
+
+export const ProfileCard = forwardRef<ProfileCardHandle>(function ProfileCard(_props, ref) {
   const [me, setMe] = useState<Me | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -65,6 +88,52 @@ export function ProfileCard() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
+  const [followModal, setFollowModal] = useState<FollowModalState | null>(null);
+  const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+
+  async function openFollowModal(type: FollowListType) {
+    setFollowModal({ type, users: [], loading: true, error: "" });
+    try {
+      const users = await apiFetch(`/api/users/me/${type}`);
+      setFollowModal({ type, users, loading: false, error: "" });
+    } catch (err) {
+      setFollowModal({
+        type,
+        users: [],
+        loading: false,
+        error: err instanceof Error ? err.message : "Failed to load.",
+      });
+    }
+  }
+
+  async function handleToggleFollowInModal(userId: string) {
+    setTogglingUserId(userId);
+    setFollowModal((prev) =>
+      prev
+        ? { ...prev, users: prev.users.map((u) => (u.id === userId ? { ...u, isFollowedByMe: !u.isFollowedByMe } : u)) }
+        : prev
+    );
+    try {
+      const data = await apiFetch(`/api/users/${userId}/follow`, { method: "POST" });
+      setFollowModal((prev) =>
+        prev
+          ? { ...prev, users: prev.users.map((u) => (u.id === userId ? { ...u, isFollowedByMe: data.following } : u)) }
+          : prev
+      );
+      setMe((prev) =>
+        prev ? { ...prev, followingCount: Math.max(0, prev.followingCount + (data.following ? 1 : -1)) } : prev
+      );
+    } catch {
+      setFollowModal((prev) =>
+        prev
+          ? { ...prev, users: prev.users.map((u) => (u.id === userId ? { ...u, isFollowedByMe: !u.isFollowedByMe } : u)) }
+          : prev
+      );
+    } finally {
+      setTogglingUserId(null);
+    }
+  }
+
   async function load() {
     setPageLoading(true);
     setLoadError("");
@@ -81,6 +150,12 @@ export function ProfileCard() {
   useEffect(() => {
     load();
   }, []);
+
+  useImperativeHandle(ref, () => ({
+    adjustFollowingCount(delta: number) {
+      setMe((prev) => (prev ? { ...prev, followingCount: Math.max(0, prev.followingCount + delta) } : prev));
+    },
+  }));
 
   async function loadMyPosts() {
     setMyPostsLoading(true);
@@ -254,14 +329,14 @@ export function ProfileCard() {
           )}
 
           <div className="mt-3 flex gap-4 text-sm">
-            <span>
+            <button type="button" onClick={() => openFollowModal("following")} className="hover:underline">
               <span className="font-semibold">{me?.followingCount ?? 0}</span>{" "}
               <span className="text-muted-foreground">Following</span>
-            </span>
-            <span>
+            </button>
+            <button type="button" onClick={() => openFollowModal("followers")} className="hover:underline">
               <span className="font-semibold">{me?.followerCount ?? 0}</span>{" "}
               <span className="text-muted-foreground">Followers</span>
-            </span>
+            </button>
           </div>
         </div>
       </div>
@@ -314,6 +389,74 @@ export function ProfileCard() {
           )}
         </div>
       </div>
+
+      {followModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setFollowModal(null)}
+        >
+          <div
+            className="flex w-full max-w-sm max-h-[70vh] flex-col rounded-lg border border-border bg-background shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border p-3">
+              <p className="text-sm font-medium">
+                {followModal.type === "following" ? "Following" : "Followers"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setFollowModal(null)}
+                aria-label="Close"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-2">
+              {followModal.loading && <p className="p-3 text-sm text-muted-foreground">Loading…</p>}
+
+              {!followModal.loading && followModal.error && (
+                <p className="p-3 text-sm text-destructive">{followModal.error}</p>
+              )}
+
+              {!followModal.loading && !followModal.error && followModal.users.length === 0 && (
+                <p className="p-3 text-sm text-muted-foreground">
+                  {followModal.type === "following" ? "Not following anyone yet." : "No followers yet."}
+                </p>
+              )}
+
+              {!followModal.loading &&
+                !followModal.error &&
+                followModal.users.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between gap-2 rounded-lg p-2 hover:bg-muted">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <Avatar src={user.avatarUrl} name={user.name} size={36} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{user.name || "Unnamed"}</p>
+                        <p className="truncate text-xs text-muted-foreground">@{user.username}</p>
+                      </div>
+                    </div>
+                    {user.id !== me?.id && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFollowInModal(user.id)}
+                        disabled={togglingUserId === user.id}
+                        className={
+                          user.isFollowedByMe
+                            ? "shrink-0 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground disabled:opacity-50"
+                            : "shrink-0 rounded-full border border-primary px-2.5 py-1 text-xs text-primary disabled:opacity-50"
+                        }
+                      >
+                        {user.isFollowedByMe ? "Following" : "Follow"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+});

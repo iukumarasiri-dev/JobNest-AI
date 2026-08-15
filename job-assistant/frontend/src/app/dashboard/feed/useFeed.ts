@@ -4,7 +4,8 @@ import type { Applicant, Post, PostComment, Resume } from "./types";
 
 type Me = { id: string; role: "JOB_SEEKER" | "EMPLOYER"; name: string | null; avatarUrl: string | null };
 
-export function useFeed() {
+export function useFeed(options?: { onFollowChange?: (delta: number) => void }) {
+  const { onFollowChange } = options ?? {};
   const [me, setMe] = useState<Me | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [resumes, setResumes] = useState<Resume[]>([]);
@@ -197,6 +198,7 @@ export function useFeed() {
             : p
         )
       );
+      onFollowChange?.(data.following ? 1 : -1);
     } catch (err) {
       setPosts(previous);
       setActionError(err instanceof Error ? err.message : "Failed to update follow.");

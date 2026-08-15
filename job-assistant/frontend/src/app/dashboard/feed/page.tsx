@@ -1,12 +1,14 @@
 "use client";
 
+import { useRef } from "react";
 import { RefreshCw } from "lucide-react";
-import { ProfileCard } from "@/components/profile-card";
+import { ProfileCard, type ProfileCardHandle } from "@/components/profile-card";
 import { useFeed } from "./useFeed";
 import { PostComposer } from "./_components/PostComposer";
 import { PostList } from "./_components/PostList";
 
 export default function FeedPage() {
+  const profileCardRef = useRef<ProfileCardHandle>(null);
   const {
     me,
     posts,
@@ -53,7 +55,9 @@ export default function FeedPage() {
     loadComments,
     handleAddComment,
     loadApplicants,
-  } = useFeed();
+  } = useFeed({
+    onFollowChange: (delta) => profileCardRef.current?.adjustFollowingCount(delta),
+  });
 
   if (pageLoading) {
     return (
@@ -149,7 +153,7 @@ export default function FeedPage() {
       </div>
 
       <div className="lg:col-span-1">
-        <ProfileCard />
+        <ProfileCard ref={profileCardRef} />
       </div>
     </div>
   );
