@@ -50,7 +50,6 @@ export function PostCard({
   onAddComment,
   onLoadApplicants,
   onApply,
-  onDelete,
   onToggleFollow,
 }: {
   post: Post;
@@ -71,7 +70,6 @@ export function PostCard({
   onAddComment: (body: string) => void;
   onLoadApplicants: () => void;
   onApply: (resumeId: string) => void;
-  onDelete: () => void;
   onToggleFollow: () => void;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -126,11 +124,6 @@ export function PostCard({
           <span className={`text-xs px-2 py-0.5 rounded-full ${POST_KIND_BADGE[post.kind]}`}>
             {post.kind === "JOB" ? "Job posting" : "Update"}
           </span>
-          {isAuthor && (
-            <button onClick={onDelete} className="text-xs text-destructive underline">
-              Delete
-            </button>
-          )}
         </div>
       </div>
 

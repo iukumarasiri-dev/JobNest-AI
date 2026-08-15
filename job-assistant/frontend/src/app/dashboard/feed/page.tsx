@@ -46,7 +46,6 @@ export default function FeedPage() {
     loadAll,
     refreshFeed,
     handleCreatePost,
-    handleDeletePost,
     handleToggleLike,
     handleToggleSave,
     handleApply,
@@ -145,7 +144,6 @@ export default function FeedPage() {
           onAddComment={handleAddComment}
           onLoadApplicants={loadApplicants}
           onApply={handleApply}
-          onDelete={handleDeletePost}
           onToggleFollow={handleToggleFollow}
         />
       </div>

@@ -119,18 +119,6 @@ export function useFeed() {
     }
   }
 
-  async function handleDeletePost(id: string) {
-    setActionError("");
-    const previous = posts;
-    setPosts((prev) => prev.filter((p) => p.id !== id));
-    try {
-      await apiFetch(`/api/posts/${id}`, { method: "DELETE" });
-    } catch (err) {
-      setPosts(previous);
-      setActionError(err instanceof Error ? err.message : "Failed to delete post.");
-    }
-  }
-
   async function handleToggleLike(id: string) {
     setActionError("");
     setLikingPostId(id);
@@ -295,7 +283,6 @@ export function useFeed() {
     loadAll,
     refreshFeed,
     handleCreatePost,
-    handleDeletePost,
     handleToggleLike,
     handleToggleSave,
     handleApply,

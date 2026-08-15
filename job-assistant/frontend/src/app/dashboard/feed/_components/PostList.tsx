@@ -20,7 +20,6 @@ export function PostList({
   onAddComment,
   onLoadApplicants,
   onApply,
-  onDelete,
   onToggleFollow,
 }: {
   posts: Post[];
@@ -41,7 +40,6 @@ export function PostList({
   onAddComment: (id: string, body: string) => void;
   onLoadApplicants: (id: string) => void;
   onApply: (id: string, resumeId: string) => void;
-  onDelete: (id: string) => void;
   onToggleFollow: (authorId: string) => void;
 }) {
   if (posts.length === 0) {
@@ -75,7 +73,6 @@ export function PostList({
           onAddComment={(body) => onAddComment(post.id, body)}
           onLoadApplicants={() => onLoadApplicants(post.id)}
           onApply={(resumeId) => onApply(post.id, resumeId)}
-          onDelete={() => onDelete(post.id)}
           onToggleFollow={() => onToggleFollow(post.author.id)}
         />
       ))}
