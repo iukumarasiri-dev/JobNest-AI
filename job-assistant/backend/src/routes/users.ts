@@ -32,6 +32,55 @@ usersRouter.get("/me/followers", async (req, res) => {
   res.json(rows.map((r) => ({ ...r.follower, isFollowedByMe: followedSet.has(r.follower.id) })));
 });
 
+usersRouter.get("/by-username/:username", async (req, res) => {
+  const viewerId = req.user!.id;
+  const user = await prisma.user.findUnique({
+    where: { username: req.params.username },
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      avatarUrl: true,
+      bannerUrl: true,
+      jobRole: true,
+      location: true,
+      birthDate: true,
+      createdAt: true,
+      role: true,
+      company: { select: { name: true } },
+    },
+  });
+  if (!user) return res.status(404).json({ error: "Not found" });
+
+  const [followerCount, followingCount, isFollowedByMe] = await Promise.all([
+    prisma.follow.count({ where: { followingId: user.id } }),
+    prisma.follow.count({ where: { followerId: user.id } }),
+    user.id === viewerId
+      ? Promise.resolve(false)
+      : prisma.follow
+          .findFirst({ where: { followerId: viewerId, followingId: user.id } })
+          .then((f) => f !== null),
+  ]);
+
+  res.json({
+    id: user.id,
+    name: user.name,
+    username: user.username,
+    avatarUrl: user.avatarUrl,
+    bannerUrl: user.bannerUrl,
+    jobRole: user.jobRole,
+    location: user.location,
+    birthDate: user.birthDate,
+    createdAt: user.createdAt,
+    role: user.role,
+    companyName: user.company?.name ?? null,
+    followerCount,
+    followingCount,
+    isFollowedByMe,
+    isMe: user.id === viewerId,
+  });
+});
+
 usersRouter.post("/:id/follow", async (req, res) => {
   const targetId = req.params.id;
   const viewerId = req.user!.id;
