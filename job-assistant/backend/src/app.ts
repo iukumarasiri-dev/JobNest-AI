@@ -10,6 +10,7 @@ import { companyRouter } from "./routes/company.js";
 import { postsRouter } from "./routes/posts.js";
 import { usersRouter } from "./routes/users.js";
 import { notificationsRouter } from "./routes/notifications.js";
+import { conversationsRouter } from "./routes/conversations.js";
 
 export const app = express();
 
@@ -35,3 +36,4 @@ app.use("/api/company", companyRouter);
 app.use("/api/posts", postsRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/conversations", conversationsRouter);
